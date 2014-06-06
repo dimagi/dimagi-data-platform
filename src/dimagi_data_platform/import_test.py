@@ -4,7 +4,6 @@ Created on Jun 5, 2014
 @author: mel
 '''
 
-
 import getpass
 import json
 import logging
@@ -30,19 +29,28 @@ form_query = Emit(table='form',
                              Literal('is_phone_submission'),
                              Literal('timeStart'),
                              Literal('timeEnd'),
-                             Literal('received_on')],
-                   source=Map(source=Apply(Reference('api_data'),Literal('form')),
+                             Literal('received_on'),
+                             Literal('case_id'),
+                             Literal('created'),
+                             Literal('updated'),
+                             Literal('closed')],
+                   source=Map(source=FlatMap(body=Reference('form..case'),
+                                             source=Apply(Reference('api_data'),Literal('form'))),
                               body=List([Reference('id'),
-                             Reference('form.@xmlns'),
-                             Reference('form.@app_id'),
-                             Reference('domain'),
-                             Reference('metadata.appVersion'),
-                             Reference('metadata.deviceID'),
-                             Reference('metadata.userID'),
-                             Reference('is_phone_submission'),
-                             Reference('metadata.timeStart'),
-                             Reference('metadata.timeEnd'),
-                             Reference('received_on')])))
+                             Reference('$.form.@xmlns'),
+                             Reference('$.form.@app_id'),
+                             Reference('$.domain'),
+                             Reference('$.metadata.appVersion'),
+                             Reference('$.metadata.deviceID'),
+                             Reference('$.metadata.userID'),
+                             Reference('$.is_phone_submission'),
+                             Reference('$.metadata.timeStart'),
+                             Reference('$.metadata.timeEnd'),
+                             Reference('$.received_on'),
+                             Reference('@case_id'),
+                             Apply(Reference('bool'),Reference('create')),
+                             Apply(Reference('bool'),Reference('update')),
+                             Apply(Reference('bool'),Reference('close')),])))
 
 writer = JValueTableWriter()
 

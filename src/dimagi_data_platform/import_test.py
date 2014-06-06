@@ -18,6 +18,32 @@ logging.basicConfig(level=logging.DEBUG,
                             format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 
 api_client = CommCareHqClient('https://www.commcarehq.org','melissa-test-project').authenticated('melissa.loudon@gmail.com', getpass.getpass())
+
+case_query = Emit(table='case', 
+                   headings=[Literal('id'),
+                             Literal('case_id'),
+                             Literal('closed'),
+                             Literal('date_closed'),
+                             Literal('date_modified'),
+                             Literal('domain'),
+                             Literal('user_id'),
+                             Literal('date_opened'),
+                             Literal('case_type'),
+                             Literal('owner_id'),
+                             Literal('parent_id')],
+                   source=Map(source=Apply(Reference('api_data'),Literal('case')),
+                              body=List([Reference('id'),
+                             Reference('case_id'),
+                             Reference('closed'),
+                             Reference('date_closed'),
+                             Reference('date_modified'),
+                             Reference('domain'),
+                             Reference('user_id'),
+                             Reference('properties.date_opened'),
+                             Reference('properties.case_type'),
+                             Reference('properties.owner_id'),
+                             Reference('indices.parent.case_id')])))
+
 form_query = Emit(table='form', 
                    headings=[Literal('id'),
                              Literal('xmlns'),
@@ -55,7 +81,7 @@ form_query = Emit(table='form',
 writer = JValueTableWriter()
 
 env = BuiltInEnv() | CommCareHqEnv(api_client) | JsonPathEnv({})
-results = form_query.eval(env)
+results = case_query.eval(env)
 
 if len(list(env.emitted_tables())) > 0:
         with writer:

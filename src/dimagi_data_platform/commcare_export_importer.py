@@ -13,7 +13,7 @@ from commcare_export.env import BuiltInEnv, JsonPathEnv
 from commcare_export.writers import SqlTableWriter, CsvTableWriter
 
 from dimagi_data_platform import importer
-from dimagi_data_platform.pg_copy_writer import CsvPlainWriter
+from dimagi_data_platform.pg_copy_writer import CsvPlainWriter, PgCopyWriter
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class CommCareExportImporter(importer.Importer):
         if not self.engine:
             raise Exception('CommCareExportImporter needs a database connection engine')
         
-        writer = CsvPlainWriter(self.api_client.project)
+        writer = PgCopyWriter(self.engine.connect(),self.api_client.project)
           
         env = BuiltInEnv() | CommCareHqEnv(self.api_client) | JsonPathEnv({})
         result = self.query.eval(env)
@@ -56,25 +56,6 @@ class CommCareExportImporter(importer.Importer):
               
         else:
             logger.warn('Nothing emitted')
-        
-        
-        conn = self.engine.connect()
-        self.engine.echo = True
-        
-        for table in env.emitted_tables():
-            abspath = ''
-            with open('%s.csv' % table['name'],'r') as csv_file:
-                abspath =  os.path.abspath(csv_file.name)
-            
-            colnames = table['headings']
-            copy_sql = "COPY %s FROM '%s' WITH CSV HEADER" % (table['name'],abspath)
-            logger.debug('copying table %s into db with sql %s'%(table['name'],copy_sql))
-            
-            trans = conn.begin()
-            conn.execute(copy_sql)
-            trans.commit()
-            
-            conn.close()
             
         
     def write_to_db(self):

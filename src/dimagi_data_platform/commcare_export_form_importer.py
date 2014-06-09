@@ -24,17 +24,18 @@ class CommCareExportFormImporter(commcare_export_importer.CommCareExportImporter
     
     @property
     def get_query(self):
+        #headings need to be lower case and not reserved words for the postgresql copy to work
         form_query = Emit(table='form',
                     headings=[Literal('id'),
                               Literal('xmlns'),
                               Literal('app_id'),
                               Literal('domain'),
-                              Literal('appVersion'),
-                              Literal('deviceID'),
-                              Literal('userID'),
+                              Literal('app_version'),
+                              Literal('device_id'),
+                              Literal('user_id'),
                               Literal('is_phone_submission'),
-                              Literal('timeStart'),
-                              Literal('timeEnd'),
+                              Literal('time_dtart'),
+                              Literal('time_end'),
                               Literal('received_on'),
                               Literal('case_id'),
                               Literal('created'),

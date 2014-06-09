@@ -6,23 +6,23 @@ Created on Jun 6, 2014
 from commcare_export.minilinq import Emit, Literal, Map, Apply, Reference, List
 from sqlalchemy.orm import query
 
-from dimagi_data_platform import CommCareExportImporter
+from dimagi_data_platform import commcare_export_importer
 
 
-class CommCareCaseExportCaseImporter(CommCareExportImporter):
+class CommCareExportCaseImporter(commcare_export_importer.CommCareExportImporter):
     '''
     An importer for cases
     '''
     
-    def __init__(self, api_client, engine):
+    def __init__(self, api_client):
         '''
         Constructor
         '''
         self.api_client = api_client
-        self.engine = engine
         
-        super.__init__(self,api_client,self.get_query(),engine)
+        super(CommCareExportCaseImporter,self).__init__(self.api_client,self.get_query)
     
+    @property
     def get_query(self):
         case_query = Emit(table='case', 
                    headings=[Literal('id'),

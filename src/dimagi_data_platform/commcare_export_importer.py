@@ -3,17 +3,14 @@ Created on Jun 6, 2014
 
 @author: mel
 '''
-import json
+
 import logging
 
 from commcare_export.commcare_minilinq import CommCareHqEnv
 from commcare_export.env import BuiltInEnv, JsonPathEnv
-from commcare_export.repeatable_iterator import RepeatableIterator
 from commcare_export.writers import SqlTableWriter
-from sqlalchemy import engine
 
-from dimagi_data_platform import Importer
-from dimagi_data_platform.import_test import api_client, case_query
+from dimagi_data_platform import importer
 
 
 logger = logging.getLogger(__name__)
@@ -21,20 +18,19 @@ logging.basicConfig(level=logging.DEBUG,
                             format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 
 
-class CommCareExportImporter(Importer):
+class CommCareExportImporter(importer.Importer):
     '''
     An importer that uses commcare-export
     '''
 
-    def __init__(self, api_client, query, engine):
+    def __init__(self, api_client, query):
         '''
         Constructor
         '''
         self.api_client = api_client
         self.query = query
-        self.engine = engine
         
-        super.__init__(self)
+        super(CommCareExportImporter,self).__init__()
         
     def do_import(self):
         
@@ -44,8 +40,11 @@ class CommCareExportImporter(Importer):
         if not self.engine:
             raise Exception('CommCareExportImporter needs a database connection engine')
         
+        
+        
         writer = SqlTableWriter(self.engine.connect())
-        env = BuiltInEnv() | CommCareHqEnv(api_client) | JsonPathEnv({})
+      
+        env = BuiltInEnv() | CommCareHqEnv(self.api_client) | JsonPathEnv({})
         result = self.query.eval(env)
         
         if len(list(env.emitted_tables())) > 0:

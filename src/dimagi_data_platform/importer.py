@@ -3,6 +3,10 @@ Created on Jun 6, 2014
 
 @author: mel
 '''
+import sqlalchemy
+
+from dimagi_data_platform import config
+
 
 class Importer(object):
     '''
@@ -14,6 +18,7 @@ class Importer(object):
         '''
         Constructor
         '''
+        self.engine = sqlalchemy.create_engine(config.DB_URL)
     
     def do_import(self):
         pass

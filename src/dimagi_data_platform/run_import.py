@@ -13,17 +13,16 @@ from dimagi_data_platform.commcare_export_form_importer import CommCareExportFor
 
 
 def main():
-
-    project = "melissa-test-project"
-
-    api_client = CommCareHqClient('https://www.commcarehq.org',project).authenticated(config.CC_USER, getpass.getpass())
     
-    importers = []
-    importers.append(CommCareExportCaseImporter(api_client))
-    importers.append(CommCareExportFormImporter(api_client))
-
-    for importer in importers:
-        importer.do_import()
+    for domain in config.DOMAINS:
+        api_client = CommCareHqClient('https://www.commcarehq.org',domain).authenticated(config.CC_USER, getpass.getpass())
+        
+        importers = []
+        importers.append(CommCareExportCaseImporter(api_client))
+        importers.append(CommCareExportFormImporter(api_client))
+    
+        for importer in importers:
+            importer.do_import()
     
 if __name__ == '__main__':
     main()

@@ -9,6 +9,7 @@ from commcare_export.commcare_hq_client import CommCareHqClient
 
 from dimagi_data_platform import config
 from dimagi_data_platform.commcare_export_case_importer import CommCareExportCaseImporter
+from dimagi_data_platform.commcare_export_form_importer import CommCareExportFormImporter
 
 
 def main():
@@ -17,9 +18,12 @@ def main():
 
     api_client = CommCareHqClient('https://www.commcarehq.org',project).authenticated(config.CC_USER, getpass.getpass())
     
-    case_importer = CommCareExportCaseImporter(api_client)
+    importers = []
+    importers.append(CommCareExportCaseImporter(api_client))
+    importers.append(CommCareExportFormImporter(api_client))
 
-    case_importer.do_import()
+    for importer in importers:
+        importer.do_import()
     
 if __name__ == '__main__':
     main()

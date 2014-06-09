@@ -19,7 +19,7 @@ def main():
         
         importers = []
         importers.append(CommCareExportCaseImporter(api_client))
-        importers.append(CommCareExportFormImporter(api_client))
+        #importers.append(CommCareExportFormImporter(api_client))
     
         for importer in importers:
             importer.do_import()

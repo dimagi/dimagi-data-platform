@@ -12,3 +12,4 @@ DB_URL = 'postgresql://%s:%s@localhost/%s' % (DB_USER,DB_PASS,DB_NAME)
 CC_USER = 'mloudon@dimagi.com'
 
 DOMAINS = ['melissa-test-project',]
+#DOMAINS = ['aaharbaseline',]

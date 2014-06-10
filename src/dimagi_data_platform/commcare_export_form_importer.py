@@ -24,9 +24,9 @@ class CommCareExportFormImporter(commcare_export_importer.CommCareExportImporter
     
     @property
     def get_query(self):
-        #headings need to be lower case and not reserved words for the postgresql copy to work
-        form_query = Emit(table='form',
-                    headings=[Literal('id'),
+        # headings need to be lower case and not reserved words for the postgresql copy to work
+        form_query = Emit(table='incoming_form',
+                    headings=[Literal('form_id'),
                               Literal('xmlns'),
                               Literal('app_id'),
                               Literal('domain'),
@@ -45,7 +45,7 @@ class CommCareExportFormImporter(commcare_export_importer.CommCareExportImporter
                                               source=Apply(Reference('api_data'), Literal('form'))),
                                body=List([Reference('id'),
                               Reference('$.form.@xmlns'),
-                              Reference('$.form.@app_id'),
+                              Reference('$.app_id'),
                               Reference('$.domain'),
                               Reference('$.metadata.appVersion'),
                               Reference('$.metadata.deviceID'),

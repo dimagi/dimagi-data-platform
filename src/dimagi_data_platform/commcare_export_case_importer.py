@@ -25,7 +25,7 @@ class CommCareExportCaseImporter(commcare_export_importer.CommCareExportImporter
     @property
     def get_query(self):
         case_query = Emit(table='incoming_cases', 
-                   headings=[Literal('id'),
+                   headings=[Literal('api_id'),
                              Literal('case_id'),
                              Literal('closed'),
                              Literal('date_closed'),

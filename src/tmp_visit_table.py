@@ -92,35 +92,14 @@ home_visit_forms = set(['http://openrosa.org/formdesigner/E41E21BB-32F9-435B-A3E
 'http://openrosa.org/formdesigner/36c07ca15eb402fb6ba3cedd709c6ce7e1e83685'])
 
       
-def create_visit(user, visited_forms, visited_cases, time_since_previous):
+def create_visit(user, visited_forms, visited_cases):
     
-    # check if there is already a visit for this user to any case in this visit within the last hour
-    first_form_in_visit = min(visited_forms, key=lambda f: f.time_start)
-    last_form_in_visit = max(visited_forms, key=lambda f: f.time_end)
-    cutoff_time = first_form_in_visit.time_start - datetime.timedelta(minutes=60)
-    most_recent_visits = Visit.select().where(Visit.time_end > cutoff_time)
+    v = Visit.create(user=user)
     
-    v = None
-    for vis in most_recent_visits:
-        if ((len(set([intr.case.case for intr in vis.interactions]) & set([visc.case for visc in visited_cases]))>0) # current cases overlap existing cases
-        | (len(set([visc.parent for visc in visited_cases]) & set([intr.case.case for intr in vis.interactions])) >0) # current parents overlap existing cases
-        | (len (set([intr.case.parent for intr in vis.interactions]) & set([visc.case for visc in visited_cases]))> 0)): # current cases overlap existing parents
-            v = vis
-            print 'there is already a visit for this case or a related case within an hour of this visit'
-            break
-    
-    if not v:
-        v = Visit.create(user=user)
-    
-    for case_id in set(pvc.case for pvc in visited_cases):
-        cs = Cases.get(Cases.case == case_id)
-        try:
-            existing_interaction = Interaction.get(case=cs, visit=v)
-        except Interaction.DoesNotExist:
-            i = Interaction.create(case=cs, visit=v)
-            i.save()
-    
-    form_total_time = 0;
+    for cs in visited_cases:
+        i = Interaction.create(case=cs, visit=v)
+        i.save()
+        
     v.home_visit = v.home_visit if v.home_visit else False
     
     for fp in visited_forms:
@@ -129,15 +108,7 @@ def create_visit(user, visited_forms, visited_cases, time_since_previous):
         
         if fp.xmlns in home_visit_forms:
             v.home_visit = True
-        
-        if ((fp.time_end is not None) & (fp.time_start is not None)):  # ignore forms without start or end time
-            form_total_time = form_total_time + (fp.time_end - fp.time_start).total_seconds()
-    
-    v.form_duration = form_total_time if not v.form_duration else v.form_duration + form_total_time
-    v.time_start = v.time_start if v.time_start else first_form_in_visit.time_start
-    v.time_end = last_form_in_visit.time_end
-    v.time_since_previous = v.time_since_previous if v.time_since_previous else time_since_previous
-    
+ 
     return v
     
 def annotate_batch_entry():
@@ -153,60 +124,53 @@ def annotate_batch_entry():
             
     
  
-def create_visits():       
-    for u in User.select().where(User.domain == 'crs-remind'):
+def create_visits():
+    case_parents = Cases.select().where(Cases.parent != None)
+    case_parent_dict = {cp.case: cp.parent for cp in case_parents} 
+    
+    for u in User.select().where(User.domain == 'crs-remind').where(User.user=='30ed810aebe033d01c01037b35914daa'):
         print("GETTING VISITS FOR USER %s" % u.user)
         prev_visited_forms = []
-        prev_visited_cases = []
-        time_since_previous = None
+        prev_visited_case_ids = []
         
         for frm in u.forms.select().order_by(Form.time_start):
-            
-            # we need to know when the last form already in this visit ended so that we know to only add this form if it's within a time cutoff
-            last_form_end = max(prev_visited_forms, key=lambda f: f.time_end).time_end if len(prev_visited_forms)> 0 else frm.time_start
             
             # all the cases in this form
             case_events = frm.caseevents
             form_cases = [ce.case for ce in case_events]
+            form_case_ids = [c.case for c in form_cases]
+            print form_case_ids
             
             # parents of cases in this form
-            related_case_ids = [fc.parent for fc in form_cases if fc.parent]
+            related_case_ids = [case_parent_dict[fc] for fc in form_case_ids if fc in case_parent_dict]
             # parents of cases already in the visit
-            previously_visited_case_relateds = [vc.parent for vc in prev_visited_cases if vc.parent]
+            previously_visited_case_relateds = [case_parent_dict[vc] for vc in prev_visited_case_ids if vc in case_parent_dict]
             
-            # form case ids
-            form_case_ids = [c.case for c in form_cases]
-            # previously visited case ids
-            prev_case_ids = [c.case for c in prev_visited_cases]
-            
-            # first, only consider adding this form to the current visit if it's within an hour of the end of the last form
-            # then if there is overlap between cases already in this visit and cases in this form don't save yet, but add the form cases to the visit cases
-            if (frm.time_start - last_form_end < (datetime.timedelta(minutes=60))) & (len(set(form_case_ids) & set(prev_case_ids)) > 0):
-                prev_visited_cases.extend(form_cases)
+            # if there is overlap between cases already in this visit and cases in this form don't save yet, but add the form cases to the visit cases
+            if len(set(form_case_ids) & set(prev_visited_case_ids)) > 0:
+                prev_visited_case_ids.extend(form_case_ids)
                 prev_visited_forms.append(frm)
             
-            # first, only consider adding this form to the current visit if it's within an hour of the end of the last form
-            # then if there is overlap between this form's related cases and cases already in this visit, or cases in this form and cases related to cases already in this visit
-            elif (frm.time_start - last_form_end < (datetime.timedelta(minutes=60))) & ((len(set(prev_case_ids) & set(related_case_ids)) > 0) | 
-                  (len(set(form_case_ids) & set(previously_visited_case_relateds)) > 0)):
-                prev_visited_cases.extend(form_cases)
+            # if there is overlap between this form's related cases and cases already in this visit, or cases in this form and cases related to cases already in this visit
+            elif (len(set(prev_visited_case_ids) & set(related_case_ids)) > 0) | (len(set(form_case_ids) & set(previously_visited_case_relateds)) > 0):
+                prev_visited_case_ids.extend(form_case_ids)
                 prev_visited_forms.append(frm)
+
     
             # otherwise save the previous visit and create new lists of forms and cases for a new visit
             else:
                 if prev_visited_forms:
-                    previous_visit = create_visit(u, prev_visited_forms, prev_visited_cases, time_since_previous)
+                    prev_visited_cases = Cases.select().where(Cases.case << prev_visited_case_ids)
+                    previous_visit = create_visit(u, prev_visited_forms, prev_visited_cases)
                     previous_visit.save()
                     print('saved visit %d with %d cases and %d forms') % (previous_visit.visit, previous_visit.interactions.select().count(), previous_visit.form_visits.select().count())
                     
-                    if frm.time_start:
-                        time_since_previous = (frm.time_start - previous_visit.time_end).total_seconds()
-                    
-                prev_visited_cases = form_cases
+                prev_visited_case_ids = form_case_ids
                 prev_visited_forms = [frm]
         
         # save the last visit for this user
-        previous_visit = create_visit(u, prev_visited_forms, prev_visited_cases, time_since_previous)
+        prev_visited_cases = Cases.select().where(Cases.case << prev_visited_case_ids)
+        previous_visit = create_visit(u, prev_visited_forms, prev_visited_cases)
         previous_visit.save()
 
 create_visits()

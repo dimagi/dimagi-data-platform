@@ -137,36 +137,37 @@ def create_visits():
             
             # all the cases in this form
             case_events = frm.caseevents
-            form_cases = [ce.case for ce in case_events]
-            form_case_ids = [c.case for c in form_cases]
-            print form_case_ids
             
-            # parents of cases in this form
-            related_case_ids = [case_parent_dict[fc] for fc in form_case_ids if fc in case_parent_dict]
-            # parents of cases already in the visit
-            previously_visited_case_relateds = [case_parent_dict[vc] for vc in prev_visited_case_ids if vc in case_parent_dict]
-            
-            # if there is overlap between cases already in this visit and cases in this form don't save yet, but add the form cases to the visit cases
-            if len(set(form_case_ids) & set(prev_visited_case_ids)) > 0:
-                prev_visited_case_ids.extend(form_case_ids)
-                prev_visited_forms.append(frm)
-            
-            # if there is overlap between this form's related cases and cases already in this visit, or cases in this form and cases related to cases already in this visit
-            elif (len(set(prev_visited_case_ids) & set(related_case_ids)) > 0) | (len(set(form_case_ids) & set(previously_visited_case_relateds)) > 0):
-                prev_visited_case_ids.extend(form_case_ids)
-                prev_visited_forms.append(frm)
-
+            if case_events.count() > 0:
+                form_case_ids = [ce.case.case for ce in case_events]
+                print form_case_ids
+                
+                # parents of cases in this form
+                related_case_ids = [case_parent_dict[fc] for fc in form_case_ids if fc in case_parent_dict]
+                # parents of cases already in the visit
+                previously_visited_case_relateds = [case_parent_dict[vc] for vc in prev_visited_case_ids if vc in case_parent_dict]
+                
+                # if there is overlap between cases already in this visit and cases in this form don't save yet, but add the form cases to the visit cases
+                if len(set(form_case_ids) & set(prev_visited_case_ids)) > 0:
+                    prev_visited_case_ids.extend(form_case_ids)
+                    prev_visited_forms.append(frm)
+                
+                # if there is overlap between this form's related cases and cases already in this visit, or cases in this form and cases related to cases already in this visit
+                elif (len(set(prev_visited_case_ids) & set(related_case_ids)) > 0) | (len(set(form_case_ids) & set(previously_visited_case_relateds)) > 0):
+                    prev_visited_case_ids.extend(form_case_ids)
+                    prev_visited_forms.append(frm)
     
-            # otherwise save the previous visit and create new lists of forms and cases for a new visit
-            else:
-                if prev_visited_forms:
-                    prev_visited_cases = Cases.select().where(Cases.case << prev_visited_case_ids)
-                    previous_visit = create_visit(u, prev_visited_forms, prev_visited_cases)
-                    previous_visit.save()
-                    print('saved visit %d with %d cases and %d forms') % (previous_visit.visit, previous_visit.interactions.select().count(), previous_visit.form_visits.select().count())
-                    
-                prev_visited_case_ids = form_case_ids
-                prev_visited_forms = [frm]
+        
+                # otherwise save the previous visit and create new lists of forms and cases for a new visit
+                else:
+                    if prev_visited_forms:
+                        prev_visited_cases = Cases.select().where(Cases.case << prev_visited_case_ids)
+                        previous_visit = create_visit(u, prev_visited_forms, prev_visited_cases)
+                        previous_visit.save()
+                        print('saved visit %d with %d cases and %d forms') % (previous_visit.visit, previous_visit.interactions.select().count(), previous_visit.form_visits.select().count())
+                        
+                    prev_visited_case_ids = form_case_ids
+                    prev_visited_forms = [frm]
         
         # save the last visit for this user
         prev_visited_cases = Cases.select().where(Cases.case << prev_visited_case_ids)

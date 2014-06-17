@@ -1,6 +1,15 @@
 from peewee import *
 import datetime
 
+import logging
+
+'''
+logger = logging.getLogger('peewee')
+logger.setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG,
+                            format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+'''
+
 database = PostgresqlDatabase('data_platform_db', **{'host': 'localhost', 'password': 'notthis', 'user': 'importer'})
 
 class UnknownField(object):
@@ -43,19 +52,17 @@ class Cases(BaseModel):
         db_table = 'cases'
         
 class CaseEvent(BaseModel):
-    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='form-occurences')
+    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='caseevents')
     form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, related_name='caseevents')
 
     class Meta:
         db_table = 'case_event'
 
 class Visit(BaseModel):
-    batch_entry = BooleanField(null=True)
     form_duration = IntegerField(null=True)
-    home_visit = BooleanField(null=True)
     time_end = DateTimeField(null=True)
-    time_since_previous = IntegerField(null=True)
     time_start = DateTimeField(null=True)
+    home_visit = BooleanField(null=True)
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='visits')
     visit = PrimaryKeyField(db_column='visit_id')
 
@@ -98,18 +105,22 @@ def create_visit(user, visited_forms, visited_cases):
     
     for cs in visited_cases:
         i = Interaction.create(case=cs, visit=v)
-        i.save()
         
     v.home_visit = v.home_visit if v.home_visit else False
     
+    v.form_duration = 0
     for fp in visited_forms:
+        v.form_duration = v.form_duration + (fp.time_end - fp.time_start).total_seconds()
         fv = FormVisit.create(visit=v, form=fp)
-        fv.save()
         
         if fp.xmlns in home_visit_forms:
             v.home_visit = True
+    
+    v.time_start = min(visited_forms, key = lambda x : x.time_start).time_start
+    v.time_end = max(visited_forms, key = lambda x : x.time_end).time_end
  
-    return v
+    v.save()
+    print('saved visit %d with %d cases and %d forms') % (v.visit, len(visited_cases), len(visited_forms))                       
     
 def annotate_batch_entry():
     for u in User.select().where(User.domain == 'crs-remind'):
@@ -125,55 +136,50 @@ def annotate_batch_entry():
     
  
 def create_visits():
-    case_parents = Cases.select().where(Cases.parent != None)
-    case_parent_dict = {cp.case: cp.parent for cp in case_parents} 
+
+    users = User.select().where(User.domain == 'crs-remind').order_by(User.user)
+    forms = Form.select().order_by(Form.time_start)
+    ces = CaseEvent.select().join(Cases)
     
-    for u in User.select().where(User.domain == 'crs-remind').where(User.user=='30ed810aebe033d01c01037b35914daa'):
+    users_prefetch = prefetch(users, forms, ces)
+    
+    for u in users_prefetch:
         print("GETTING VISITS FOR USER %s" % u.user)
         prev_visited_forms = []
-        prev_visited_case_ids = []
+        prev_visited_cases = []
         
-        for frm in u.forms.select().order_by(Form.time_start):
+        for frm in u.forms_prefetch:
             
-            # all the cases in this form
-            case_events = frm.caseevents
-            
-            if case_events.count() > 0:
-                form_case_ids = [ce.case.case for ce in case_events]
-                print form_case_ids
-                
-                # parents of cases in this form
-                related_case_ids = [case_parent_dict[fc] for fc in form_case_ids if fc in case_parent_dict]
-                # parents of cases already in the visit
-                previously_visited_case_relateds = [case_parent_dict[vc] for vc in prev_visited_case_ids if vc in case_parent_dict]
+            case_events = frm.caseevents_prefetch
+            if len(case_events) > 0:
+                form_cases = [cec.case for cec in case_events]
+                prev_visited_case_ids = [pvc.case for pvc in prev_visited_cases]
                 
                 # if there is overlap between cases already in this visit and cases in this form don't save yet, but add the form cases to the visit cases
-                if len(set(form_case_ids) & set(prev_visited_case_ids)) > 0:
-                    prev_visited_case_ids.extend(form_case_ids)
+                if len(set([fc.case for fc in form_cases]) & set(prev_visited_case_ids)) > 0:
+                    for frm_case in form_cases:
+                        if frm_case.case not in prev_visited_case_ids:
+                            prev_visited_cases.append(frm_case)
+                    
                     prev_visited_forms.append(frm)
                 
                 # if there is overlap between this form's related cases and cases already in this visit, or cases in this form and cases related to cases already in this visit
-                elif (len(set(prev_visited_case_ids) & set(related_case_ids)) > 0) | (len(set(form_case_ids) & set(previously_visited_case_relateds)) > 0):
-                    prev_visited_case_ids.extend(form_case_ids)
+                elif (len(set(prev_visited_case_ids) & set([fc.parent for fc in form_cases if fc.parent])) > 0) | (len(set([fc.case for fc in form_cases]) & set([pvc.parent for pvc in prev_visited_cases if pvc.parent])) > 0):
+                    for frm_case in form_cases:
+                        if frm_case.case not in prev_visited_case_ids:
+                            prev_visited_cases.append(frm_case)
                     prev_visited_forms.append(frm)
     
         
                 # otherwise save the previous visit and create new lists of forms and cases for a new visit
                 else:
                     if prev_visited_forms:
-                        prev_visited_cases = Cases.select().where(Cases.case << prev_visited_case_ids)
                         previous_visit = create_visit(u, prev_visited_forms, prev_visited_cases)
-                        previous_visit.save()
-                        print('saved visit %d with %d cases and %d forms') % (previous_visit.visit, previous_visit.interactions.select().count(), previous_visit.form_visits.select().count())
                         
-                    prev_visited_case_ids = form_case_ids
+                    prev_visited_cases = form_cases
                     prev_visited_forms = [frm]
         
         # save the last visit for this user
-        prev_visited_cases = Cases.select().where(Cases.case << prev_visited_case_ids)
         previous_visit = create_visit(u, prev_visited_forms, prev_visited_cases)
-        previous_visit.save()
 
 create_visits()
-# annotate_home_visits()
-# annotate_batch_entry()

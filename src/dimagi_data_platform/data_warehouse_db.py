@@ -42,8 +42,9 @@ class Form(BaseModel):
     form = CharField(db_column='form_id', max_length=255, primary_key=True)
     time_end = DateTimeField(null=True)
     time_start = DateTimeField(null=True)
-    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms')
+    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms', on_delete='CASCADE')
     xmlns = CharField(max_length=255, null=True)
+    domain = CharField(db_column='domain', max_length=255)
 
     class Meta:
         db_table = 'form'
@@ -56,17 +57,18 @@ class Cases(BaseModel):
     date_closed = CharField(max_length=255, null=True)
     date_modified = CharField(max_length=255, null=True)
     date_opened = CharField(max_length=255, null=True)
-    owner = ForeignKeyField(db_column='owner_id', null=True, rel_model=User, related_name='owned_cases')
+    owner = ForeignKeyField(db_column='owner_id', null=True, rel_model=User, related_name='owned_cases', on_delete='CASCADE')
     parent = CharField(db_column='parent_id', max_length=255, null=True)
-    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='user_cases')
+    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='user_cases', on_delete='CASCADE')
+    domain = CharField(db_column='domain', max_length=255)
 
     class Meta:
         db_table = 'cases'
 models.append(Cases)
         
 class CaseEvent(BaseModel):
-    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='caseevents')
-    form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, related_name='caseevents')
+    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='caseevents', on_delete='CASCADE')
+    form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, related_name='caseevents', on_delete='CASCADE')
 
     class Meta:
         db_table = 'case_event'
@@ -77,7 +79,7 @@ class Visit(BaseModel):
     time_end = DateTimeField(null=True)
     time_start = DateTimeField(null=True)
     home_visit = BooleanField(null=True)
-    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='visits')
+    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='visits', on_delete='CASCADE')
     visit = PrimaryKeyField(db_column='visit_id')
 
     class Meta:
@@ -85,8 +87,8 @@ class Visit(BaseModel):
 models.append(Visit)
 
 class Interaction(BaseModel):
-    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='interactions')
-    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='interactions')
+    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='interactions', on_delete='CASCADE')
+    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='interactions', on_delete='CASCADE')
 
     class Meta:
         db_table = 'case_visit'
@@ -94,7 +96,7 @@ models.append(Interaction)
 
 class FormVisit(BaseModel):
     form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form)
-    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='form_visits')
+    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='form_visits', on_delete='CASCADE')
 
     class Meta:
         db_table = 'form_visit'

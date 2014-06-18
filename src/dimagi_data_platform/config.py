@@ -17,9 +17,9 @@ PEEWEE_DB_CON = PostgresqlDatabase(DB_NAME, **{'host': 'localhost', 'password': 
 
 CC_USER = 'mloudon@dimagi.com'
 
-#DOMAINS = ['melissa-test-project',]
+DOMAINS = ['melissa-test-project',]
 #DOMAINS = ['aaharbaseline',] # 6 minutes
-DOMAINS = ['crs-imci',] # 8 minutes
+#DOMAINS = ['crs-imci',] # 8 minutes
 #DOMAINS = ['crs-remind',] # 
 
 

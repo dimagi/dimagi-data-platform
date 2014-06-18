@@ -31,11 +31,12 @@ class VisitTableUpdater(StandardTableUpdater):
     updates the user table from form data
     '''
 
-    def __init__(self, domain):
+    def __init__(self, dbconn, domain):
         '''
         Constructor
         '''
         self.domain = domain
+        super(VisitTableUpdater, self).__init__(dbconn)
         
     def create_visit(self, user, visited_forms, visited_cases):
         
@@ -63,7 +64,9 @@ class VisitTableUpdater(StandardTableUpdater):
     def update_table(self):
         
         users = User.select().where(User.domain == self.domain).order_by(User.user)
-        Visit.delete().where(Visit.user << users)
+
+        delete_query = Visit.delete().where(Visit.user << users)
+        delete_query.execute()
         
         forms = Form.select().where(~(Form.time_end >> None) & ~(Form.time_start >> None)).order_by(Form.time_start)
         ces = CaseEvent.select().join(Cases)

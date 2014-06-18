@@ -56,8 +56,3 @@ class CommCareExportImporter(importer.Importer):
               
         else:
             logger.warn('Nothing emitted')
-            
-        
-    def write_to_db(self):
-        pass
-        

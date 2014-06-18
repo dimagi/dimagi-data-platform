@@ -49,7 +49,3 @@ class CommCareExportCaseImporter(commcare_export_importer.CommCareExportImporter
                              Reference('properties.owner_id'),
                              Reference('indices.parent.case_id')])))
         return case_query
-        
-        
-    def write_to_db(self):
-        pass

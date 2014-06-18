@@ -18,12 +18,8 @@ class Importer(object):
         '''
         Constructor
         '''
-        self.engine = sqlalchemy.create_engine(config.DB_URL)
+        self.engine = sqlalchemy.create_engine(config.SQLALCHEMY_DB_URL)
     
     def do_import(self):
-        pass
-        
-    
-    def write_to_db(self):
         pass
     

@@ -34,7 +34,7 @@ class CommCareExportFormImporter(commcare_export_importer.CommCareExportImporter
                               Literal('device_id'),
                               Literal('user_id'),
                               Literal('is_phone_submission'),
-                              Literal('time_dtart'),
+                              Literal('time_start'),
                               Literal('time_end'),
                               Literal('received_on'),
                               Literal('case_id'),
@@ -59,7 +59,3 @@ class CommCareExportFormImporter(commcare_export_importer.CommCareExportImporter
                               Apply(Reference('bool'), Reference('update')),
                               Apply(Reference('bool'), Reference('close')), ])))
         return form_query
-        
-        
-    def write_to_db(self):
-        pass

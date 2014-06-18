@@ -1,89 +1,9 @@
-from peewee import *
-import datetime
+from peewee import prefetch
 
-import logging
-
-'''
-logger = logging.getLogger('peewee')
-logger.setLevel(logging.DEBUG)
-logging.basicConfig(level=logging.DEBUG,
-                            format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-'''
-
-database = PostgresqlDatabase('data_platform_db', **{'host': 'localhost', 'password': 'notthis', 'user': 'importer'})
-
-class UnknownField(object):
-    pass
-
-class BaseModel(Model):
-    class Meta:
-        database = database
-
-class User(BaseModel):
-    user = CharField(db_column='user_id', max_length=255, null=True)
-    domain = CharField(db_column='domain', max_length=255)
-
-    class Meta:
-        db_table = 'users'
-
-class Form(BaseModel):
-    app = CharField(db_column='app_id', max_length=255, null=True)
-    form = CharField(db_column='form_id', max_length=255, primary_key=True)
-    time_end = DateTimeField(null=True)
-    time_start = DateTimeField(null=True)
-    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms')
-    xmlns = CharField(max_length=255, null=True)
-
-    class Meta:
-        db_table = 'form'
-
-class Cases(BaseModel):
-    case = CharField(db_column='case_id', max_length=255, primary_key=True)
-    case_type = CharField(max_length=255, null=True)
-    closed = CharField(max_length=255, null=True)
-    date_closed = CharField(max_length=255, null=True)
-    date_modified = CharField(max_length=255, null=True)
-    date_opened = CharField(max_length=255, null=True)
-    owner = ForeignKeyField(db_column='owner_id', null=True, rel_model=User, related_name='owned_cases')
-    parent = CharField(db_column='parent_id', max_length=255, null=True)
-    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='user_cases')
-
-    class Meta:
-        db_table = 'cases'
-        
-class CaseEvent(BaseModel):
-    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='caseevents')
-    form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, related_name='caseevents')
-
-    class Meta:
-        db_table = 'case_event'
-
-class Visit(BaseModel):
-    form_duration = IntegerField(null=True)
-    time_end = DateTimeField(null=True)
-    time_start = DateTimeField(null=True)
-    home_visit = BooleanField(null=True)
-    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='visits')
-    visit = PrimaryKeyField(db_column='visit_id')
-
-    class Meta:
-        db_table = 'visit'
+from dimagi_data_platform.data_warehouse_db import Visit, Interaction, FormVisit, User, \
+    Form, CaseEvent, Cases
 
 
-class Interaction(BaseModel):
-    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='interactions')
-    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='interactions')
-
-    class Meta:
-        db_table = 'case_visit'
-
-class FormVisit(BaseModel):
-    form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form)
-    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='form_visits')
-
-    class Meta:
-        db_table = 'form_visit'
-        
 home_visit_forms = set(['http://openrosa.org/formdesigner/E41E21BB-32F9-435B-A3E9-BEB08C4743A1',
 'http://openrosa.org/formdesigner/0FA17225-70BC-4284-A38B-6C4E16E6CA4F',
 'http://openrosa.org/formdesigner/4A49479F-BEBD-498D-A08B-4F0EAAD4DDBB',
@@ -138,7 +58,7 @@ def annotate_batch_entry():
 def create_visits():
 
     users = User.select().where(User.domain == 'crs-remind').order_by(User.user)
-    forms = Form.select().order_by(Form.time_start)
+    forms = Form.select().where( ~(Form.time_end >> None) & ~(Form.time_start >> None)).order_by(Form.time_start)
     ces = CaseEvent.select().join(Cases)
     
     users_prefetch = prefetch(users, forms, ces)
@@ -180,6 +100,7 @@ def create_visits():
                     prev_visited_forms = [frm]
         
         # save the last visit for this user
-        previous_visit = create_visit(u, prev_visited_forms, prev_visited_cases)
+        if prev_visited_forms:
+            previous_visit = create_visit(u, prev_visited_forms, prev_visited_cases)
 
 create_visits()

@@ -30,7 +30,8 @@ class BaseModel(Model):
 models = []
 
 class User(BaseModel):
-    user = CharField(db_column='user_id', max_length=255, null=True)
+    id = PrimaryKeyField(db_column='id')
+    user = CharField(db_column='user_id', max_length=255)
     domain = CharField(db_column='domain', max_length=255)
 
     class Meta:
@@ -38,8 +39,9 @@ class User(BaseModel):
 models.append(User)
 
 class Form(BaseModel):
+    id = PrimaryKeyField(db_column='id')
     app = CharField(db_column='app_id', max_length=255, null=True)
-    form = CharField(db_column='form_id', max_length=255, primary_key=True)
+    form = CharField(db_column='form_id', max_length=255)
     time_end = DateTimeField(null=True)
     time_start = DateTimeField(null=True)
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms', on_delete='CASCADE')
@@ -101,6 +103,14 @@ class FormVisit(BaseModel):
     class Meta:
         db_table = 'form_visit'
 models.append(FormVisit)
+
+def create_missing_tables():
+    database.connect()
+    
+    for m in models:
+        m.create_table(fail_silently=True)
+        
+    database.commit()
         
 def drop_and_create():
     database.connect()

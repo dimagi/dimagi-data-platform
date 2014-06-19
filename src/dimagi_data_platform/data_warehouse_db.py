@@ -53,7 +53,8 @@ class Form(BaseModel):
 models.append(Form)
 
 class Cases(BaseModel):
-    case = CharField(db_column='case_id', max_length=255, primary_key=True)
+    id = PrimaryKeyField(db_column='id')
+    case = CharField(db_column='case_id', max_length=255)
     case_type = CharField(max_length=255, null=True)
     closed = CharField(max_length=255, null=True)
     date_closed = CharField(max_length=255, null=True)
@@ -69,6 +70,7 @@ class Cases(BaseModel):
 models.append(Cases)
         
 class CaseEvent(BaseModel):
+    id = PrimaryKeyField(db_column='id')
     case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='caseevents', on_delete='CASCADE')
     form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, related_name='caseevents', on_delete='CASCADE')
 

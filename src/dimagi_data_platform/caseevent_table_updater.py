@@ -23,7 +23,7 @@ class CaseEventTableUpdater(StandardTableUpdater):
     def update_table(self):
         with self.conn.cursor() as curs:
             curs.execute("delete from case_event where form_id in (select id from form where domain like '%s');"%self.domain)
-            curs.execute("insert into case_event(form_id, case_id) (select form.id, cases.case_id from incoming_form, form, cases "
+            curs.execute("insert into case_event(form_id, case_id) (select form.id, cases.id from incoming_form, form, cases "
                          "where incoming_form.form_id = form.form_id and incoming_form.case_id = cases.case_id "
                          "and incoming_form.domain like '%s');" %self.domain)
         

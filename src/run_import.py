@@ -21,8 +21,11 @@ from dimagi_data_platform.visit_table_updater import VisitTableUpdater
 
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG,
-                            format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+hdlr = logging.FileHandler('/var/tmp/data_platform_run.log')
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr) 
+logger.setLevel(logging.DEBUG)
 
 def main():
     

@@ -16,10 +16,6 @@ from dimagi_data_platform import importer
 from dimagi_data_platform.pg_copy_writer import CsvPlainWriter, PgCopyWriter
 
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG,
-                            format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-
 
 class CommCareExportImporter(importer.Importer):
     '''
@@ -51,8 +47,8 @@ class CommCareExportImporter(importer.Importer):
         if len(list(env.emitted_tables())) > 0:
             with writer:
                 for table in env.emitted_tables():
-                    logger.debug('Writing %s', table['name'])
+                   
                     writer.write_table(table)
               
         else:
-            logger.warn('Nothing emitted')
+            pass

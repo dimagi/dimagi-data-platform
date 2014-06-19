@@ -14,7 +14,7 @@ from dimagi_data_platform.caseevent_table_updater import CaseEventTableUpdater
 from dimagi_data_platform.cases_table_updater import CasesTableUpdater
 from dimagi_data_platform.commcare_export_case_importer import CommCareExportCaseImporter
 from dimagi_data_platform.commcare_export_form_importer import CommCareExportFormImporter
-from dimagi_data_platform.data_warehouse_db import drop_and_create
+from dimagi_data_platform.data_warehouse_db import create_missing_tables
 from dimagi_data_platform.form_table_updater import FormTableUpdater
 from dimagi_data_platform.user_table_updater import UserTableUpdater
 from dimagi_data_platform.visit_table_updater import VisitTableUpdater
@@ -27,7 +27,8 @@ logging.basicConfig(level=logging.DEBUG,
 def main():
     
         password = getpass.getpass()
-        drop_and_create()
+
+        create_missing_tables()
         
         for domain in config.DOMAINS:
             api_client = CommCareHqClient('https://www.commcarehq.org',domain).authenticated(config.CC_USER,password )

@@ -64,7 +64,7 @@ class VisitTableUpdater(StandardTableUpdater):
     def update_table(self):
         
         users = User.select().where(User.domain == self.domain).order_by(User.user)
-
+        
         delete_query = Visit.delete().where(Visit.user << users)
         delete_query.execute()
         

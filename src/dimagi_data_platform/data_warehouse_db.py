@@ -99,7 +99,7 @@ class Interaction(BaseModel):
 models.append(Interaction)
 
 class FormVisit(BaseModel):
-    form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form)
+    form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, on_delete='CASCADE')
     visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='form_visits', on_delete='CASCADE')
 
     class Meta:

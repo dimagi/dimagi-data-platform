@@ -31,7 +31,7 @@ models = []
 
 class User(BaseModel):
     id = PrimaryKeyField(db_column='id')
-    user = CharField(db_column='user_id', max_length=255)
+    user = CharField(db_column='user_id', max_length=255, null=True)
     domain = CharField(db_column='domain', max_length=255)
 
     class Meta:

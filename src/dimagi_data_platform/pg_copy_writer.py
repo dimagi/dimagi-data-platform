@@ -13,6 +13,7 @@ import os
 
 from commcare_export.writers import TableWriter, MAX_COLUMN_SIZE, SqlTableWriter
 import six
+import itertools
 
 from dimagi_data_platform import config
 
@@ -37,6 +38,7 @@ class CsvPlainWriter(TableWriter):
             writer = csv.writer(csv_file, dialect=csv.excel)
             writer.writerow(table['headings'])
             for row in table['rows']:
+                print [val for val in row]
                 writer.writerow([val.encode('utf-8') if isinstance(val, six.text_type) else val
                                  for val in row])
 
@@ -107,10 +109,13 @@ class PgCopyWriter(SqlTableWriter):
         
      
         # make headings the same as col names
+        first_row = None
         for row in table['rows']:
-            first_row_dict = OrderedDict(zip(table['headings'], row))
+            first_row = row
+            first_row_dict = OrderedDict(zip(table['headings'], first_row))
             break
 
+        table['rows'] = itertools.chain([first_row], table['rows'])
         
         self.make_table_compatible(table_name, first_row_dict)
         

@@ -26,9 +26,11 @@ logging.basicConfig(level=logging.DEBUG,
 
 def main():
     
-    
+        password = getpass.getpass()
+        drop_and_create()
+        
         for domain in config.DOMAINS:
-            api_client = CommCareHqClient('https://www.commcarehq.org',domain).authenticated(config.CC_USER, getpass.getpass())
+            api_client = CommCareHqClient('https://www.commcarehq.org',domain).authenticated(config.CC_USER,password )
             
             importers = []
             importers.append(CommCareExportCaseImporter(api_client))
@@ -37,7 +39,7 @@ def main():
             for importer in importers:
                 importer.do_import()
             
-            drop_and_create()
+            
             
             with LoggingConnection(config.PSYCOPG_RAW_CON) as dbconn:
                 LoggingConnection.initialize(dbconn,logger)

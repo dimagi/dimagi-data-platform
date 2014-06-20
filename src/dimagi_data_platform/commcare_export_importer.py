@@ -3,10 +3,7 @@ Created on Jun 6, 2014
 
 @author: mel
 '''
-
 import logging
-import os
-import zipfile
 
 from commcare_export.commcare_minilinq import CommCareHqEnv
 from commcare_export.env import BuiltInEnv, JsonPathEnv
@@ -16,6 +13,12 @@ from dimagi_data_platform import importer
 from dimagi_data_platform.pg_copy_writer import CsvPlainWriter, PgCopyWriter
 
 
+logger = logging.getLogger(__name__)
+hdlr = logging.FileHandler('/var/tmp/data_platform_run.log')
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr) 
+logger.setLevel(logging.DEBUG)
 
 class CommCareExportImporter(importer.Importer):
     '''

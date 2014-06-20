@@ -19,7 +19,6 @@ from dimagi_data_platform.form_table_updater import FormTableUpdater
 from dimagi_data_platform.user_table_updater import UserTableUpdater
 from dimagi_data_platform.visit_table_updater import VisitTableUpdater
 
-
 logger = logging.getLogger(__name__)
 hdlr = logging.FileHandler('/var/tmp/data_platform_run.log')
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
@@ -42,7 +41,6 @@ def main():
         
             for importer in importers:
                 importer.do_import()
-            
             
             
             with LoggingConnection(config.PSYCOPG_RAW_CON) as dbconn:

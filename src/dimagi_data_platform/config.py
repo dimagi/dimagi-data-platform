@@ -3,8 +3,9 @@ Created on Jun 6, 2014
 
 @author: mel
 '''
-from peewee import PostgresqlDatabase
+import logging
 
+from peewee import PostgresqlDatabase
 
 DB_USER = 'importer'
 DB_PASS = 'notthis'
@@ -17,8 +18,8 @@ PEEWEE_DB_CON = PostgresqlDatabase(DB_NAME, **{'host': 'localhost', 'password': 
 
 CC_USER = 'mloudon@dimagi.com'
 
-DOMAINS = ['melissa-test-project'] 
-#DOMAINS = ['melissa-test-project','crs-imci'] 
+#DOMAINS = ['melissa-test-project'] 
+DOMAINS = ['melissa-test-project','crs-imci'] 
 #DOMAINS = ['aaharbaseline',] # 6 minutes
 #DOMAINS = ['crs-imci',] # 8 minutes
 #DOMAINS = ['crs-remind',] # 

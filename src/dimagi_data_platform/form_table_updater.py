@@ -25,10 +25,11 @@ class FormTableUpdater(StandardTableUpdater):
             curs.execute("delete from form where domain like '%s'" % self.domain)
 
             curs.execute("insert into form (form_id, xmlns, app_id, time_start, time_end, user_id, domain) "
-                "(select form_id, xmlns, app_id, to_timestamp(replace(time_start,'T',' '),'YYYY-MM-DD HH24:MI:SS') "
+                "(select distinct on (form_id) form_id, xmlns, app_id, to_timestamp(replace(time_start,'T',' '),'YYYY-MM-DD HH24:MI:SS') "
                 "as time_start, to_timestamp(replace(time_end,'T',' '),'YYYY-MM-DD HH24:MI:SS') as time_end, users.id as user_id, incoming_form.domain "
-                "from incoming_form, users where incoming_form.domain like '%s' and users.user_id = incoming_form.user_id "
-                "group  by form_id, xmlns, app_id, time_start,time_end, users.id, incoming_form.domain);"  % self.domain)
+                "from incoming_form, users "
+                "where incoming_form.domain like '%s' and users.user_id = incoming_form.user_id  and users.domain = incoming_form.domain "
+                "order by form_id, time_start);"  % self.domain)
 
         
         

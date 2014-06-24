@@ -5,21 +5,21 @@ Created on Jun 6, 2014
 '''
 
 from peewee import PostgresqlDatabase
-DB_USER = 'importer'
-DB_PASS = 'notthis'
-DB_NAME = 'data_platform_db'
+DB_USER = 'my_user'
+DB_PASS = 'my_pass'
+DB_NAME = 'my_db'
 
-CC_USER = 'mloudon@dimagi.com'
+CC_USER = 'ccuser@dimagi.com'
 
-DOMAINS = ['melissa-test-project']
+DOMAINS = ['my-test-project']
 
 TMP_FILES_DIR = '../tmp_files'
 OUTPUT_DIR = '../output'
 
 REPORTS = ['mobile_user_monthly_lifetime_tables'] 
 
-TMP_FILES_DIR = '../tmp_files'
-OUTPUT_DIR = '../output'
+AWS_S3_OUTPUT_URL = 's3://mybucket/output'
+
 
 from local_config import *
 

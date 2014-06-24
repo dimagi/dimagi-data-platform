@@ -1,12 +1,16 @@
 '''
-Created on Jun 17, 2014
+Created on Jun 23, 2014
 
 @author: mel
 '''
 
-from peewee import *
 
-database = PostgresqlDatabase('data_platform_db_2', **{'host': 'localhost', 'password': 'notthis', 'user': 'importer'})
+from peewee import Model, CharField, drop_model_tables, PrimaryKeyField
+
+from dimagi_data_platform import config
+
+
+database = config.PEEWEE_DB_CON
 
 class UnknownField(object):
     pass
@@ -14,8 +18,11 @@ class UnknownField(object):
 class BaseModel(Model):
     class Meta:
         database = database
+        
+models = []
 
 class IncomingCases(BaseModel):
+    id = PrimaryKeyField(db_column='id')
     api = CharField(db_column='api_id', max_length=255, null=True)
     case = CharField(db_column='case_id', max_length=255, null=True)
     case_type = CharField(max_length=255, null=True)
@@ -30,8 +37,10 @@ class IncomingCases(BaseModel):
 
     class Meta:
         db_table = 'incoming_cases'
+models.append(IncomingCases)
 
 class IncomingForm(BaseModel):
+    id = PrimaryKeyField(db_column='id')
     app = CharField(db_column='app_id', max_length=255, null=True)
     app_version = CharField(max_length=255, null=True)
     case = CharField(db_column='case_id', max_length=255, null=True)
@@ -50,4 +59,21 @@ class IncomingForm(BaseModel):
 
     class Meta:
         db_table = 'incoming_form'
-
+models.append(IncomingForm)
+        
+def create_missing_tables():
+    database.connect()
+    
+    for m in models:
+        m.create_table(fail_silently=True)
+        
+    database.commit()
+        
+def drop_and_create():
+    database.connect()
+    drop_model_tables(models,fail_silently=True)
+    
+    for m in models:
+        m.create_table()
+        
+    database.commit()

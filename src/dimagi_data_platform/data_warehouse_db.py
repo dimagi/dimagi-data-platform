@@ -4,11 +4,11 @@ Created on Jun 17, 2014
 @author: mel
 '''
 
-from peewee import PostgresqlDatabase, Model, CharField, DateTimeField, \
+from peewee import  Model, CharField, DateTimeField, \
     ForeignKeyField, IntegerField, BooleanField, PrimaryKeyField, \
     drop_model_tables
 
-from dimagi_data_platform import config
+import config
 
 
 database = config.PEEWEE_DB_CON

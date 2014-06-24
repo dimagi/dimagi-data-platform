@@ -5,7 +5,7 @@ Created on Jun 6, 2014
 '''
 import sqlalchemy
 
-from dimagi_data_platform import config
+import config
 
 
 class Importer(object):

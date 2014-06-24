@@ -8,7 +8,6 @@ import logging
 import os
 import subprocess
 
-from boto.s3.connection import S3Connection
 from commcare_export.commcare_hq_client import CommCareHqClient
 from psycopg2.extras import LoggingConnection
 

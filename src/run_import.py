@@ -8,6 +8,7 @@ import logging
 import os
 import subprocess
 
+from boto.s3.connection import S3Connection
 from commcare_export.commcare_hq_client import CommCareHqClient
 from psycopg2.extras import LoggingConnection
 
@@ -31,7 +32,6 @@ logger.setLevel(logging.DEBUG)
 
 def run_proccess_and_log(cmd,args_list):
     proc_list = [cmd]+ args_list
-
     proc=subprocess.Popen(proc_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = proc.communicate()
     if stdout:
@@ -75,8 +75,9 @@ def main():
         output_path = os.path.abspath(config.OUTPUT_DIR)
         
         for report in config.REPORTS:
-            run_proccess_and_log("Rscript",["R/%s.R" % report, domain_list, r_script_path, output_path])
-            
+            run_proccess_and_log('Rscript',[os.path.join(r_script_path,'%s.R' % report), domain_list, r_script_path, output_path])
+        
+        run_proccess_and_log('aws',['s3','sync',output_path,config.AWS_S3_OUTPUT_URL])
     
 if __name__ == '__main__':
     main()

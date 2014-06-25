@@ -11,12 +11,12 @@ import subprocess
 from commcare_export.commcare_hq_client import CommCareHqClient
 from psycopg2.extras import LoggingConnection
 
-import config
+from dimagi_data_platform import data_warehouse_db, incoming_data_tables, config
 from dimagi_data_platform.caseevent_table_updater import CaseEventTableUpdater
 from dimagi_data_platform.cases_table_updater import CasesTableUpdater
 from dimagi_data_platform.commcare_export_case_importer import CommCareExportCaseImporter
 from dimagi_data_platform.commcare_export_form_importer import CommCareExportFormImporter
-from dimagi_data_platform.data_warehouse_db import create_missing_tables
+
 from dimagi_data_platform.form_table_updater import FormTableUpdater
 from dimagi_data_platform.user_table_updater import UserTableUpdater
 from dimagi_data_platform.visit_table_updater import VisitTableUpdater
@@ -37,13 +37,15 @@ def run_proccess_and_log(cmd,args_list):
         logger.info(stdout)
     if stderr:
         logger.error(stderr)
+        
+def setup():
+    incoming_data_tables.create_missing_tables()
+    data_warehouse_db.create_missing_tables()
 
 def main():
-    
+        setup()
         password = getpass.getpass()
 
-        create_missing_tables()
-        
         for domain in config.DOMAINS:
             api_client = CommCareHqClient('https://www.commcarehq.org',domain).authenticated(config.CC_USER,password )
             

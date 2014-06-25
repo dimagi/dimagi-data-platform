@@ -8,8 +8,7 @@ from peewee import  Model, CharField, DateTimeField, \
     ForeignKeyField, IntegerField, BooleanField, PrimaryKeyField, \
     drop_model_tables
 
-import config
-
+from dimagi_data_platform import config
 
 database = config.PEEWEE_DB_CON
 

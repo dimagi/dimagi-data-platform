@@ -13,8 +13,9 @@ import os
 from commcare_export.writers import TableWriter, SqlTableWriter
 import six
 
-import config
+from dimagi_data_platform import config
 
+database = config.PEEWEE_DB_CON
 
 class CsvPlainWriter(TableWriter):
     def __init__(self, dir):

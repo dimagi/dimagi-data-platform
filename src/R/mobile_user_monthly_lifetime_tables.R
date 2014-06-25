@@ -8,13 +8,13 @@ library(reshape2)
 # get command line args: domain list and output dir
 args <- commandArgs(trailingOnly = TRUE)
 
-#domain_list <- args[1]
-#r_script_path <- args[2]
-#output_path <- args[3]
+domain_list <- args[1]
+r_script_path <- args[2]
+output_path <- args[3]
 
-domain_list <- "'melissa-test-project','crc-imci'"
-r_script_path <- "/home/mel/workspace/dimagi-data-platform/src/R"
-output_path <-"/home/mel/workspace/dimagi-data-platform/output"
+#domain_list <- "'melissa-test-project','crc-imci'"
+#r_script_path <- "/home/mel/workspace/dimagi-data-platform/src/R"
+#output_path <-"/home/mel/workspace/dimagi-data-platform/output"
 
 # get data source
 data_source_file = file.path(r_script_path,"db_source_mobile_user_tables.R", fsep = .Platform$file.sep)
@@ -30,32 +30,46 @@ related_cases_index_child <- which(duplicated(v$time_start)) # this returns all 
 v$related <- c("No")
 v$related[related_cases_index_child] <- "Yes" # this flags all multiple-case visits
 
-
 # remove demo_user
 v0 <- v[which(v$user_id != "demo_user"),]
 v0$user_id <- factor(v0$user_id)
 
-# split into a list of data frames to operate
-x <- x[order(x$user_id, x$time_start), ]
-x$date_difference <- c(NA, diff(x$visit_date)) # this examines if sorted visits happen in the same or different days
-x$time_since_previous[which(x$time_since_previous == "")] <- NA # this seems to be "NA" already if you import that in R in linux (not sure why it's missing here on Mac)
-x$visit_weekday <- as.numeric(format(x$visit_date, "%w"))
-x$time_since_previous <- as.numeric(x$time_since_previous)
-x$batch_entry <- ifelse(x$date_difference == 0 & x$time_since_previous < 600, 1, 0)  # time_since_previous is calculated in seconds
-x$time_ffs <- strftime(x$time_start, format = "%H:%M:%S")
-x$visit_hour <- strftime(x$time_start, format = "%H") # extract hour from time vector
-x$visit_time <- ifelse(x$time_ffs >= "06:00:00" & x$time_ffs < "12:00:00", "morning", 
-                       ifelse(x$time_ffs >= "12:00:00" & x$time_ffs < "18:00:00", "afternoon",
-                              ifelse(x$time_ffs >= "18:00:00" & x$time_ffs < "24:00:00", "night", "after midnight")))
-x <- x[order(x$case_id, x$time_start), ]
-x$days_elapsed_case <- c(NA, as.numeric(diff(x$visit_date, units = "days")))
-x$days_elapsed_case[which(diff(as.numeric(factor(x$case_id, ordered = TRUE))) != 0) + 1] <- NA # flagged child_case visits are excluded from calculation
-x$days_elapsed_case[1] <- NA
-x$new_case <- ifelse(is.na(x$days_elapsed_case) == TRUE, 1, 0) # this flags all visits registering a new case
-x$follow_up <- ifelse(is.na(x$days_elapsed_case) == FALSE, 1, 0) # likewise, flagging all followup visits
-return(x)
-})
 
+# split into a list of data frames to operate
+# split into a list of data frames to operate
+library(plyr)
+v1 <- dlply(v0, .(domain))
+
+for (i in seq_along(v1)) {
+  v1[[i]]$domain.index <- i 
+} # assign domain index 
+
+# operate on list of data frames
+v2 <- lapply(v1, function(x){
+  nvisits_raw <- as.data.frame(table(x$user_id)) 
+  nvisits_raw <- nvisits_raw[order(nvisits_raw$Var1), ]
+  user_remove <- nvisits_raw$Var1[which(nvisits_raw$Freq == 1)] # this returns user_id with only one visit in their whole CC lifecycle
+  x <- x[!x$user_id %in% user_remove,] # this removes users who have been active only for once in their CC lifecycle
+  x$user_id <- factor(x$user_id)
+  x <- x[order(x$user_id, x$time_start), ]
+  x$date_difference <- c(NA, diff(x$visit_date)) # this examines if sorted visits happen in the same or different days
+  x$time_since_previous[which(x$time_since_previous == "")] <- NA # this seems to be "NA" already if you import that in R in linux (not sure why it's missing here on Mac)
+  x$visit_weekday <- as.numeric(format(x$visit_date, "%w"))
+  x$time_since_previous <- as.numeric(x$time_since_previous)
+  x$batch_entry <- ifelse(x$date_difference == 0 & x$time_since_previous < 600, 1, 0)  # time_since_previous is calculated in seconds
+  x$time_ffs <- strftime(x$time_start, format = "%H:%M:%S")
+  x$visit_hour <- strftime(x$time_start, format = "%H") # extract hour from time vector
+  x$visit_time <- ifelse(x$time_ffs >= "06:00:00" & x$time_ffs < "12:00:00", "morning", 
+                         ifelse(x$time_ffs >= "12:00:00" & x$time_ffs < "18:00:00", "afternoon",
+                                ifelse(x$time_ffs >= "18:00:00" & x$time_ffs < "24:00:00", "night", "after midnight")))
+  x <- x[order(x$case_id, x$time_start), ]
+  x$days_elapsed_case <- c(NA, as.numeric(diff(x$visit_date, units = "days")))
+  x$days_elapsed_case[which(diff(as.numeric(factor(x$case_id, ordered = TRUE))) != 0) + 1] <- NA # flagged child_case visits are excluded from calculation
+  x$days_elapsed_case[1] <- NA
+  x$new_case <- ifelse(is.na(x$days_elapsed_case) == TRUE, 1, 0) # this flags all visits registering a new case
+  x$follow_up <- ifelse(is.na(x$days_elapsed_case) == FALSE, 1, 0) # likewise, flagging all followup visits
+  return(x)
+})
 # this computes average number of cases visited in an hour for each domain, will be added to user-indexed lifetime table later
 v3 <- lapply(v2, function(x){
   y <- as.data.frame(table(x$user_id, x$visit_hour)) 
@@ -67,9 +81,6 @@ v3 <- lapply(v2, function(x){
   y1_aggr$avg.cases_visited_per_active_hour <- round(y1_aggr$avg.cases_visited_per_active_hour, 2)
   return(y1_aggr) # this would be an indicator for flw lifetime and monthly table
 })
-
-
-
 # compute user indexed table
 f0 <- lapply(v2, function(x) {
   x$user_id <- factor(x$user_id)
@@ -95,7 +106,7 @@ f0 <- lapply(v2, function(x) {
   next.month <- function(d) as.Date(as.yearmon(d) + 1/12) + 
     as.numeric(d - as.Date(as.yearmon(d)))
   next1 <- next.month(y$date_first_visit) # this returns the same Date in the following month
-  index1 <- which(next1 == y$calendar_month_start)  # this returns the index of mobile users with a starting time on the first day in a month 
+  index1 <- which(next1 == y$calendar_month_start)    # this returns the index of mobile users with a starting time on the first day in a month 
   if(length(index1)) y$calendar_month_start[index1] <- as.Date(as.yearmon(y$calendar_month_start[index1]) - 1/12, frac = 0) 
   
   next2 <- next.month(y$calendar_month_end)
@@ -112,20 +123,17 @@ f0 <- lapply(v2, function(x) {
   if(length(index2)) y$active_months[index2] <- y$active_months[index2] + 1 # FAdding one month back for users with a last visit on month end
   y$active_months <- ifelse(y$calendar_months_on_cc == 0, 0, y$active_months)
   y$active_month_percent <- as.numeric(round(y$active_months/y$calendar_months_on_cc, 2))  # denominator can be 0, active_month_percent in this case is NaN
-  
   activity_by_day <- as.data.frame(table(x$user_id, x$visit_date))
   activity_by_day <- activity_by_day[which(activity_by_day$Freq != 0),] # this returns visits on each active day by a user
   activity_by_day.count <- aggregate(activity_by_day$Var2, list(activity_by_day$Var1), function(x) length(unique(x))) # total active days of a user
   activity_by_day.count.s <- activity_by_day.count[order(activity_by_day.count$Group.1), ]
   y$active_days <- activity_by_day.count.s$x
   y$active_day_percent <- round(y$active_days/y$days_on_cc, 2) # denominators would never be 0 in this calculation
-  
   nforms <- aggregate(total_forms~user_id, data = x, sum) # this returns total forms submitted in all visits by a given user
   nforms <- nforms[order(nforms$user_id), ]
   y$nforms <- nforms$forms_per_visit
   visit_duration <- aggregate(form_duration~user_id, data = x, median) # MEDIAN TIME DURATION PER VISIT IN SECs
   y$median_visit_duration <- as.numeric(round(visit_duration$form_duration/60, 2)) # in minutes
-  
   d <- as.data.frame(table(x$visit_date, x$user_id)) # this returns number of unique visits in a day by a given mobile user
   d <- subset(d, Freq != 0)
   dsub <- d[order(d$Var2), ] 
@@ -142,7 +150,6 @@ f0 <- lapply(v2, function(x) {
   mean_time_elapse <- with(v, aggregate(time_since_previous, list(user_id), FUN = mean, na.rm = TRUE))
   y$median_time_btw_visits <- median_time_elapse$x
   y$mean_time_elapse_btw_visits <- mean_time_elapse$x
-  
   c <- x[order(x$user_id, x$case_id, x$time_start), ]
   ct1 <- tail(c$time_start, -1)
   ct2 <- head(c$time_end, -1)
@@ -158,7 +165,6 @@ f0 <- lapply(v2, function(x) {
   y$median_days_btw_followup <- round(y$median_time_btw_followup/60/24, 2)
   y$mean_time_btw_followup <- c3$x # IN MINUTES
   y$mean_days_btw_followup <- round(y$mean_time_btw_followup/60/24, 2) # convert minutes into days
-  
   temp <- as.matrix(table(x$user_id, x$batch_entry)) # this returns a matrix of batch/non-batch for each unique worker
   if(length(dimnames(temp)) > 2) { # meaning there are both batch and non-batch visits in a domain
     batch <- as.data.frame(temp[, "1"]) 
@@ -171,7 +177,6 @@ f0 <- lapply(v2, function(x) {
     y$batch_entry_percent <- 1}else{
       y$tot_batch_visits <- 0
       y$batch_entry_percent <- 0}        
-  
   y$domain.index <- rep(x$domain.index[1], nrow(y)) # adding domain index and domain name to lifetime table
   y$domain.name <- rep(x$domain[1], nrow(y))
   y$domain.index <- factor(y$domain.index)
@@ -186,7 +191,6 @@ f0 <- lapply(v2, function(x) {
   y1 <- Reduce(function(...) merge(..., all=T), merge_me)
   return(y1)
 })
-
 visit_time_percentage <- lapply(v2, function(x){
   ddply(x, .(user_id), function(x){
     r1 <- data.frame(table(x$visit_time)/nrow(x))
@@ -195,12 +199,10 @@ visit_time_percentage <- lapply(v2, function(x){
     return(r1)    
   })
 })
-
 reshaped_visit_time <- lapply(visit_time_percentage, function(x){
   r2 <- dcast(x, user_id~time)
   return(r2)
 })
-
 # adding avg.cases visited per hour to user-indexed table
 # apply merge to two lists of data frames
 f1 <- do.call("rbind", f0) # combine multiple 
@@ -209,22 +211,12 @@ reshaped_visit_time <- do.call("rbind.fill", reshaped_visit_time)
 merge_me <- list(f1, avg.cases, reshaped_visit_time)
 f2 <- Reduce(function(...) merge(..., all=T), merge_me)
 f2$case_followup_rate <- round(f2$follow_up/f2$new_cases, 2)
-
-
-
-
 ######################################
 # Monthly table computation
 user_list <- lapply(v2, function(x) {
   x.split <- split(x, x$user_id)
   return(x.split)
 }) # this splits visit tables of each domain into tables for each flw
-for (i in seq_along(user_list)) {
-  for (j in seq_along(user_list[[i]])) {
-    filename <- paste(names(user_list[[i]][j]), sep = "", ".csv")
-    write.csv(user_list[[i]][[j]], filename)
-  }
-} # this exports visit tables for every single flw into csv
 
 # right now user_list is a list of list. should be converted to a single list for monthly table computation
 user_list <- unlist(user_list, recursive = F) # unlist does the trick here
@@ -236,7 +228,6 @@ user_list_1 <- lapply(user_list, function(x) {
   # x$month.index <- factor(x$month.index, levels(x$month.index)) # these two lines refactoring yearmon() format var month.index can be optimized earlier when computing visit table
   return(x)
 })
-
 m <- lapply(user_list_1, function(x){
   y1 <- aggregate(follow_up~month.index, data = x, sum) # FOLLOW_UP VISITS PER MONTH (NOTE: MULTIPLE FOLLOWUPS TO ONE GIVEN CASE IS POSSIBLE THUS FOLLOW_UP VISITS != UNIQUE CASES BEING FOLLOWED UP)
   names(y1) <- c("month.index", "follow_up_visits")
@@ -249,7 +240,6 @@ m <- lapply(user_list_1, function(x){
   t2 <- ddply(t1, .(month.index), function(x) sum(x[x$new_case == 1, ]$count)) # This calcualates new cases opened in each active month
   names(t2) <- c("month.index", "case_registered")
   t2$cum_case_registered <- cumsum(t2$case_registered) # could be an empty data frame if there is no new case in a month
-  
   # this calculates proportion of visits in different time period in a day (am,pm,after-pm, etc)
   res1 <- ddply(x, c("user_id", "month.index"), function(x){
     r1 <- data.frame(table(x$visit_time)/nrow(x))
@@ -269,8 +259,6 @@ m <- lapply(user_list_1, function(x){
   
   return(y3)
 })
-
-
 m1 <- lapply(user_list_1, function(x){
   y1 <- as.data.frame(table(x$month.index))
   names(y1) <- c("month.index", "visits") # this calculates total visits in each active month
@@ -325,21 +313,16 @@ m1 <- lapply(user_list_1, function(x){
   
   return(y12)
 })
-
 # join data frames in M and M1. This returns the monthly table for each user throughout their lifetime on CommCare
 monthly_table <- Reduce(function(x,y) Map(cbind, x, y),list(m, m1)) # this does not filter out any flw with only a few visits in one incomplete calendar month
 monthly <- lapply(monthly_table, function(x){x[!duplicated(lapply(x, digest))]})
 monthly_merge <- do.call("rbind.fill", monthly)
-
-
-
 #################################
 mainDir <- getwd()
 subDir0 <- "monthly"
 dir.create(file.path(mainDir, subDir0))
 setwd(file.path(mainDir, subDir0))
 write.csv(monthly_merge, "monthly_merge.csv") # this keeps the monthly table output into wherever the working directory of R session is
-
 #export visit table output
 subDir1 <- "visit"
 dir.create(file.path(mainDir, subDir1))
@@ -351,12 +334,11 @@ visitOut <- function(x) {
   }
 }
 visitOut(v2)
-
-
 # export lifetime table 
 subDir2 <- "lifetime"
 dir.create(file.path(mainDir, subDir2))
 setwd(file.path(mainDir, subDir2))
+lifetime.split <- split(f2, f2$domain.name)
 
 lifeOut <- function(x) {
   for (i in seq_along(x)) {
@@ -364,7 +346,6 @@ lifeOut <- function(x) {
     write.csv(x[[i]], filename[i])
   }
 }
-lifeOut(f2) 
-
-
+lifeOut(lifetime.split) 
+######################################
 # Rashmi: attrition report

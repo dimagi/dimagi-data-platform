@@ -15,6 +15,7 @@ import six
 
 import config
 
+
 class CsvPlainWriter(TableWriter):
     def __init__(self, dir):
         self.dir = dir

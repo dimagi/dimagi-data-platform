@@ -12,10 +12,6 @@ domain_list <- args[1]
 r_script_path <- args[2]
 output_path <- args[3]
 
-#domain_list <- "'melissa-test-project','crc-imci'"
-#r_script_path <- "/home/mel/workspace/dimagi-data-platform/src/R"
-#output_path <-"/home/mel/workspace/dimagi-data-platform/output"
-
 # get data source
 data_source_file = file.path(r_script_path,"db_source_mobile_user_tables.R", fsep = .Platform$file.sep)
 # data_source_file = file.path(r_script_path,"csv_source_mobile_user_tables.R", fsep = .Platform$file.sep)
@@ -327,6 +323,8 @@ write.csv(monthly_merge, "monthly_merge.csv") # this keeps the monthly table out
 subDir1 <- "visit"
 dir.create(file.path(mainDir, subDir1))
 setwd(file.path(mainDir, subDir1))
+
+filename = vector()
 visitOut <- function(x) {
   for (i in seq_along(x)) {
     filename[i] <- paste(x[[i]]$domain[1], sep = "", ".csv")

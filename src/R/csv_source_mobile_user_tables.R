@@ -1,3 +1,10 @@
+#specify these here since args will be null unless running from command line
+domain_list <- "'melissa-test-project','crc-imci'"
+r_script_path <- "/home/mel/workspace/dimagi-data-platform/src/R"
+output_path <-"/home/mel/workspace/dimagi-data-platform/output"
+
+setwd(output_path)
+
 v <- read.csv("interaction_table_sample2.csv", header = TRUE)
 
 # update timedate format (importing data from csv automatically makes it into factor variable in R)

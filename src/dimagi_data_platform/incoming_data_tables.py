@@ -7,9 +7,9 @@ Created on Jun 23, 2014
 
 from peewee import Model, CharField, drop_model_tables, PrimaryKeyField
 
-from dimagi_data_platform import config
+from dimagi_data_platform import conf
 
-database = config.PEEWEE_DB_CON
+database = conf.PEEWEE_DB_CON
 
 class UnknownField(object):
     pass

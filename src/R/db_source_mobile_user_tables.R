@@ -3,7 +3,13 @@ library(RPostgreSQL)
 drv <- dbDriver("PostgreSQL")
 
 # should read DB conn properties from config file
-con <- dbConnect(drv, dbname="data_platform_db",user="importer",pass="notthis",host="localhost", port="5432")
+con <- dbConnect(drv, dbname=conf$database$dbname,
+                 user=conf$database$user,
+                 pass=conf$database$pass,
+                 host=conf$database$host, 
+                 port=conf$database$port)
+
+domain_list <- paste(lapply(conf$domains$name,sprintf,fmt="'%s'"),sep=" ", collapse=",")
 query <- sprintf("with a as 
                  (select visit_id, count (distinct form_id) as total_forms 
                  from form_visit 

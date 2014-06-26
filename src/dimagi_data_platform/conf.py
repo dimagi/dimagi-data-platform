@@ -23,6 +23,7 @@ CC_USER = _json_conf['commcare_export']['username']
 
 DOMAINS = [d['name'] for d in _json_conf['domains']]
 
+# use paths for these or the R script won't find them
 TMP_FILES_DIR = _json_conf['directories']['tmp_files']
 OUTPUT_DIR = _json_conf['directories']['output']
 

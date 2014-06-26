@@ -5,19 +5,23 @@ library(plyr)
 library(timeDate)
 library(reshape2)
 
-# get command line args: domain list and output dir
+# get r script path and config file path as command line args
 args <- commandArgs(trailingOnly = TRUE)
 
-domain_list <- args[1]
-r_script_path <- args[2]
-output_path <- args[3]
+r_script_path <- args[1]
+config_path <- args[2]
+
+# get the config parameters
+config_file = file.path(config_path,"config.json", fsep = .Platform$file.sep)
+library("jsonlite")
+conf<-fromJSON(config_file)$data_platform
 
 # get data source
-data_source_file = file.path(r_script_path,"db_source_mobile_user_tables.R", fsep = .Platform$file.sep)
-# data_source_file = file.path(r_script_path,"csv_source_mobile_user_tables.R", fsep = .Platform$file.sep)
-source(data_source_file,chdir=T)
+data_source_loader = file.path(r_script_path,"db_source_mobile_user_tables.R", fsep = .Platform$file.sep)
+# data_source_loader = file.path(r_script_path,"csv_source_mobile_user_tables.R", fsep = .Platform$file.sep)
+source(data_source_loader,chdir=T)
 
-setwd(output_path)
+setwd(conf$directories$output)
 
 # get visit date from time start NOTE may be arbitrary - phone timestamps not necessarily correct
 v$visit_date <- as.Date(v$time_start)

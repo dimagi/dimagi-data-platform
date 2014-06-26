@@ -13,9 +13,9 @@ import os
 from commcare_export.writers import TableWriter, SqlTableWriter
 import six
 
-from dimagi_data_platform import config
+from dimagi_data_platform import conf
 
-database = config.PEEWEE_DB_CON
+database = conf.PEEWEE_DB_CON
 
 class CsvPlainWriter(TableWriter):
     def __init__(self, dir):
@@ -76,7 +76,7 @@ class PgCopyWriter(SqlTableWriter):
     def write_table(self, table, db_cols, hstore_col_name):
         prefix = self.project
         
-        csvdir = config.TMP_FILES_DIR
+        csvdir = conf.TMP_FILES_DIR
         csvfilename = '%s-%s.csv' % (prefix, table['name'])
         
         csv_writer = CsvPlainWriter(csvdir)        

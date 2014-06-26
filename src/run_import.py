@@ -11,7 +11,7 @@ import subprocess
 from commcare_export.commcare_hq_client import CommCareHqClient
 from psycopg2.extras import LoggingConnection
 
-from dimagi_data_platform import data_warehouse_db, incoming_data_tables, config
+from dimagi_data_platform import data_warehouse_db, incoming_data_tables, conf
 from dimagi_data_platform.caseevent_table_updater import CaseEventTableUpdater
 from dimagi_data_platform.cases_table_updater import CasesTableUpdater
 from dimagi_data_platform.commcare_export_case_importer import CommCareExportCaseImporter
@@ -46,8 +46,8 @@ def main():
         setup()
         password = getpass.getpass()
 
-        for domain in config.DOMAINS:
-            api_client = CommCareHqClient('https://www.commcarehq.org',domain).authenticated(config.CC_USER,password )
+        for domain in conf.DOMAINS:
+            api_client = CommCareHqClient('https://www.commcarehq.org',domain).authenticated(conf.CC_USER,password )
             
             importers = []
             importers.append(CommCareExportCaseImporter(api_client))
@@ -57,7 +57,7 @@ def main():
                 importer.do_import()
             
             
-            with LoggingConnection(config.PSYCOPG_RAW_CON) as dbconn:
+            with LoggingConnection(conf.PSYCOPG_RAW_CON) as dbconn:
                 LoggingConnection.initialize(dbconn,logger)
                 table_updaters = []
                 table_updaters.append(UserTableUpdater(dbconn,domain))
@@ -71,14 +71,13 @@ def main():
             vt = VisitTableUpdater(dbconn,domain)
             vt.update_table()
         
-        domain_list = ','.join(["'%s'"% domain for domain in config.DOMAINS])
         r_script_path = os.path.abspath('R/')
-        output_path = os.path.abspath(config.OUTPUT_DIR)
+        conf_path = os.path.abspath('.')
         
-        for report in config.REPORTS:
-            run_proccess_and_log('Rscript',[os.path.join(r_script_path,'%s.R' % report), domain_list, r_script_path, output_path])
+        for report in conf.REPORTS:
+            run_proccess_and_log('Rscript',[os.path.join(r_script_path,'%s.R' % report), r_script_path, conf_path])
         
-        run_proccess_and_log('aws',['s3','sync',output_path,config.AWS_S3_OUTPUT_URL])
+        run_proccess_and_log('aws',['s3','sync',conf.OUTPUT_DIR,conf.AWS_S3_OUTPUT_URL])
     
 if __name__ == '__main__':
     main()

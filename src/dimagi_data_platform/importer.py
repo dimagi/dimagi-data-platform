@@ -5,7 +5,7 @@ Created on Jun 6, 2014
 '''
 import sqlalchemy
 
-import config
+import conf
 
 
 class Importer(object):
@@ -18,7 +18,7 @@ class Importer(object):
         '''
         Constructor
         '''
-        self.engine = sqlalchemy.create_engine(config.SQLALCHEMY_DB_URL)
+        self.engine = sqlalchemy.create_engine(conf.SQLALCHEMY_DB_URL)
     
     def do_import(self):
         pass

@@ -8,9 +8,9 @@ from peewee import  Model, CharField, DateTimeField, \
     ForeignKeyField, IntegerField, BooleanField, PrimaryKeyField, \
     drop_model_tables
 
-from dimagi_data_platform import config
+from dimagi_data_platform import conf
 
-database = config.PEEWEE_DB_CON
+database = conf.PEEWEE_DB_CON
 
 class UnknownField(object):
     pass

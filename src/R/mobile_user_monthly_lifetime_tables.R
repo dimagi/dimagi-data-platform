@@ -8,8 +8,8 @@ library(reshape2)
 # get r script path and config file path as command line args
 args <- commandArgs(trailingOnly = TRUE)
 
-r_script_path <- args[1]
-config_path <- args[2]
+r_script_path <- args[1] # where to find the other scripts we're sourcing
+config_path <- args[2] # where to find config.json
 
 # get the config parameters
 config_file = file.path(config_path,"config.json", fsep = .Platform$file.sep)
@@ -17,7 +17,10 @@ library("jsonlite")
 conf<-fromJSON(config_file)$data_platform
 
 # get data source
+# a database query
 data_source_loader = file.path(r_script_path,"db_source_mobile_user_tables.R", fsep = .Platform$file.sep)
+
+# or just a csv file of results, for testing
 # data_source_loader = file.path(r_script_path,"csv_source_mobile_user_tables.R", fsep = .Platform$file.sep)
 source(data_source_loader,chdir=T)
 
@@ -328,7 +331,7 @@ subDir1 <- "visit"
 dir.create(file.path(mainDir, subDir1))
 setwd(file.path(mainDir, subDir1))
 
-filename = vector()
+filename <- vector()
 visitOut <- function(x) {
   for (i in seq_along(x)) {
     filename[i] <- paste(x[[i]]$domain[1], sep = "", ".csv")

@@ -14,7 +14,8 @@ class CommCareExportFormImporter(commcare_export_importer.CommCareExportImporter
     '''
     An importer for cases
     '''
-    incoming_table_name = IncomingForm._meta.db_table
+    _hstore_col_name = None
+    _incoming_table_class = IncomingForm
     
     def __init__(self, api_client):
         '''
@@ -22,20 +23,12 @@ class CommCareExportFormImporter(commcare_export_importer.CommCareExportImporter
         '''
         self.api_client = api_client
         
-        super(CommCareExportFormImporter, self).__init__(self.api_client, self.get_query, self.incoming_table_name, self.get_db_cols, self.get_hstore_col_name)
+        super(CommCareExportFormImporter, self).__init__(self.api_client)
     
     @property
-    def get_db_cols(self):
-        return [v.db_column for v in IncomingForm._meta.fields.values()]
-        
-    @property
-    def get_hstore_col_name(self):
-        return None
-    
-    @property
-    def get_query(self):
+    def _get_query(self):
         # headings need to be lower case and not reserved words for the postgresql copy to work
-        form_query = Emit(table=self.incoming_table_name,
+        form_query = Emit(table=self._get_table_name,
                     headings=[Literal('form_id'),
                               Literal('xmlns'),
                               Literal('app_id'),

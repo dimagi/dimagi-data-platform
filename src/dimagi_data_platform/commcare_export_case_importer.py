@@ -14,26 +14,19 @@ class CommCareExportCaseImporter(commcare_export_importer.CommCareExportImporter
     '''
     An importer for cases
     '''
-    incoming_table_name = IncomingCases._meta.db_table
+    _hstore_col_name = None
+    _incoming_table_class = IncomingCases
     
     def __init__(self, api_client):
         '''
         Constructor
         '''
         self.api_client = api_client      
-        super(CommCareExportCaseImporter,self).__init__(self.api_client,self.get_query,self.incoming_table_name, self.get_db_cols, self.get_hstore_col_name)
-        
-    @property
-    def get_db_cols(self):
-        return [v.db_column for v in IncomingCases._meta.fields.values()]
-        
-    @property
-    def get_hstore_col_name(self):
-        return None
+        super(CommCareExportCaseImporter,self).__init__(self.api_client)
     
     @property
-    def get_query(self):
-        case_query = Emit(table=self.incoming_table_name, 
+    def _get_query(self):
+        case_query = Emit(table=self._get_table_name, 
                    headings=[Literal('api_id'),
                              Literal('case_id'),
                              Literal('closed'),

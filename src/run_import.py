@@ -23,13 +23,7 @@ from dimagi_data_platform.incoming_data_tables import IncomingDomain
 from dimagi_data_platform.user_table_updater import UserTableUpdater
 from dimagi_data_platform.visit_table_updater import VisitTableUpdater
 
-
-logger = logging.getLogger(__name__)
-hdlr = logging.FileHandler('/var/tmp/data_platform_run.log')
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-hdlr.setFormatter(formatter)
-logger.addHandler(hdlr) 
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger('dimagi_data_platform')
 
 def run_proccess_and_log(cmd,args_list):
     proc_list = [cmd]+ args_list
@@ -94,7 +88,7 @@ def main():
         password = getpass.getpass()
         
         update_platform_data()
-        #run_for_domains(conf.DOMAINS, password)
+        run_for_domains(conf.DOMAINS, password)
         
         r_script_path = os.path.abspath('R/')
         conf_path = os.path.abspath('.')
@@ -102,7 +96,7 @@ def main():
         for report in conf.REPORTS:
             run_proccess_and_log('Rscript',[os.path.join(r_script_path,'%s.R' % report), r_script_path, conf_path])
         
-        #run_proccess_and_log('aws',['s3','sync',conf.OUTPUT_DIR,conf.AWS_S3_OUTPUT_URL])
+        run_proccess_and_log('aws',['s3','sync',conf.OUTPUT_DIR,conf.AWS_S3_OUTPUT_URL])
     
 if __name__ == '__main__':
     main()

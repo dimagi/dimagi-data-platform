@@ -8,12 +8,15 @@ write csv files for a set of database columns, as well as an optional hstore col
 '''
 from collections import OrderedDict
 import csv
+import logging
 import os
 
 from commcare_export.writers import TableWriter, SqlTableWriter
 import six
 
 from dimagi_data_platform import conf
+
+logger = logging.getLogger(__name__)
 
 database = conf.PEEWEE_DB_CON
 

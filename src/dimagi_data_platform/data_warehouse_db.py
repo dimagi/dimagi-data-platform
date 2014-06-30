@@ -4,6 +4,8 @@ Created on Jun 17, 2014
 @author: mel
 '''
 
+import logging
+
 from peewee import  Model, CharField, DateTimeField, \
     ForeignKeyField, IntegerField, BooleanField, PrimaryKeyField, \
     drop_model_tables
@@ -11,11 +13,11 @@ from playhouse.postgres_ext import HStoreField
 
 from dimagi_data_platform import conf
 
-import logging
 logger = logging.getLogger('peewee')
-logger.setLevel(logging.DEBUG)
-logger.addHandler(logging.StreamHandler())
-
+logging.basicConfig(level=conf.log_level,
+                    format='%(asctime)s %(levelname)s %(message)s',
+                    filename='/var/tmp/data_platform_run.log',
+                    filemode='w')
 
 database = conf.PEEWEE_DB_CON
 

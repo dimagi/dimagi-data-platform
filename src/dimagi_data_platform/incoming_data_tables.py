@@ -5,15 +5,18 @@ Created on Jun 23, 2014
 '''
 
 
+import logging
+
 from peewee import Model, CharField, drop_model_tables, PrimaryKeyField
 from playhouse.postgres_ext import *
 
 from dimagi_data_platform import conf
 
-import logging
 logger = logging.getLogger('peewee')
-logger.setLevel(logging.DEBUG)
-logger.addHandler(logging.StreamHandler())
+logging.basicConfig(level=conf.log_level,
+                    format='%(asctime)s %(levelname)s %(message)s',
+                    filename='/var/tmp/data_platform_run.log',
+                    filemode='w')
 
 database = conf.PEEWEE_DB_CON
 

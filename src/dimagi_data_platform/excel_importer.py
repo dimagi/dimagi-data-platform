@@ -52,6 +52,9 @@ class ExcelImporter(importer.Importer):
     
     def do_import(self):
         
+        dq = self._incoming_table_class.delete()
+        dq.execute()
+        
         db_col_keys = [k for k in self._get_workbook_keys() if k in self._get_db_cols]
         hstore_keys = [h for h in self._get_workbook_keys() if h not in self._get_db_cols]
         
@@ -61,8 +64,7 @@ class ExcelImporter(importer.Importer):
             
             insert_dict = db_col_dict
             insert_dict[self._get_hstore_db_col] = hstore_col_dict
-            
-            print insert_dict
+
             self._incoming_table_class.create(**insert_dict)
 
             

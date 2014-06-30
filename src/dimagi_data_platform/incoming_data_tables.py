@@ -10,6 +10,11 @@ from playhouse.postgres_ext import *
 
 from dimagi_data_platform import conf
 
+import logging
+logger = logging.getLogger('peewee')
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler())
+
 database = conf.PEEWEE_DB_CON
 
 class UnknownField(object):

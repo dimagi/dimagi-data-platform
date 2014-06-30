@@ -16,6 +16,7 @@ from dimagi_data_platform.caseevent_table_updater import CaseEventTableUpdater
 from dimagi_data_platform.cases_table_updater import CasesTableUpdater
 from dimagi_data_platform.commcare_export_case_importer import CommCareExportCaseImporter
 from dimagi_data_platform.commcare_export_form_importer import CommCareExportFormImporter
+from dimagi_data_platform.domain_table_updater import DomainTableUpdater
 from dimagi_data_platform.excel_importer import ExcelImporter
 from dimagi_data_platform.form_table_updater import FormTableUpdater
 from dimagi_data_platform.incoming_data_tables import IncomingDomain
@@ -42,36 +43,58 @@ def run_proccess_and_log(cmd,args_list):
 def setup():
     incoming_data_tables.create_missing_tables()
     data_warehouse_db.create_missing_tables()
+    
+def update_platform_data():
+    '''
+    update from master lists of domains, forms etc
+    '''
+    importers = []
+    importers.append(ExcelImporter(IncomingDomain,"domains.xlsx"))
+    
+    for importer in importers:
+        importer.do_import()
+    
+    with LoggingConnection(conf.PSYCOPG_RAW_CON) as dbconn:
+        LoggingConnection.initialize(dbconn,logger)
+        table_updaters = []
+        table_updaters.append(DomainTableUpdater(dbconn))
+        
+        for table_updater in table_updaters:
+            table_updater.update_table()
+            
+def run_for_domains(domainlist, password):
+    for domain in domainlist:
+        api_client = CommCareHqClient('https://www.commcarehq.org',domain).authenticated(conf.CC_USER,password )
+        
+        importers = []
+        importers.append(CommCareExportCaseImporter(api_client))
+        importers.append(CommCareExportFormImporter(api_client))
+        importers.append(ExcelImporter(IncomingDomain,"domains.xlsx"))
+    
+        for importer in importers:
+            importer.do_import()
+        
+        
+        with LoggingConnection(conf.PSYCOPG_RAW_CON) as dbconn:
+            LoggingConnection.initialize(dbconn,logger)
+            table_updaters = []
+            table_updaters.append(UserTableUpdater(dbconn,domain))
+            table_updaters.append(FormTableUpdater(dbconn,domain))
+            table_updaters.append(CasesTableUpdater(dbconn,domain))
+            table_updaters.append(CaseEventTableUpdater(dbconn,domain))
+            
+            for table_updater in table_updaters:
+                table_updater.update_table()
+        
+        vt = VisitTableUpdater(dbconn,domain)
+        vt.update_table()
 
 def main():
         setup()
         password = getpass.getpass()
-
-        for domain in conf.DOMAINS:
-            api_client = CommCareHqClient('https://www.commcarehq.org',domain).authenticated(conf.CC_USER,password )
-            
-            importers = []
-            importers.append(CommCareExportCaseImporter(api_client))
-            importers.append(CommCareExportFormImporter(api_client))
-            importers.append(ExcelImporter(IncomingDomain,"domains.xlsx"))
         
-            for importer in importers:
-                importer.do_import()
-            
-            
-            with LoggingConnection(conf.PSYCOPG_RAW_CON) as dbconn:
-                LoggingConnection.initialize(dbconn,logger)
-                table_updaters = []
-                table_updaters.append(UserTableUpdater(dbconn,domain))
-                table_updaters.append(FormTableUpdater(dbconn,domain))
-                table_updaters.append(CasesTableUpdater(dbconn,domain))
-                table_updaters.append(CaseEventTableUpdater(dbconn,domain))
-                
-                for table_updater in table_updaters:
-                    table_updater.update_table()
-            
-            vt = VisitTableUpdater(dbconn,domain)
-            vt.update_table()
+        update_platform_data()
+        #run_for_domains(conf.DOMAINS, password)
         
         r_script_path = os.path.abspath('R/')
         conf_path = os.path.abspath('.')
@@ -79,7 +102,7 @@ def main():
         for report in conf.REPORTS:
             run_proccess_and_log('Rscript',[os.path.join(r_script_path,'%s.R' % report), r_script_path, conf_path])
         
-        run_proccess_and_log('aws',['s3','sync',conf.OUTPUT_DIR,conf.AWS_S3_OUTPUT_URL])
+        #run_proccess_and_log('aws',['s3','sync',conf.OUTPUT_DIR,conf.AWS_S3_OUTPUT_URL])
     
 if __name__ == '__main__':
     main()

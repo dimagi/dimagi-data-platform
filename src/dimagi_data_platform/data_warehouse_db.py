@@ -7,8 +7,15 @@ Created on Jun 17, 2014
 from peewee import  Model, CharField, DateTimeField, \
     ForeignKeyField, IntegerField, BooleanField, PrimaryKeyField, \
     drop_model_tables
+from playhouse.postgres_ext import HStoreField
 
 from dimagi_data_platform import conf
+
+import logging
+logger = logging.getLogger('peewee')
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler())
+
 
 database = conf.PEEWEE_DB_CON
 
@@ -20,6 +27,47 @@ class BaseModel(Model):
         database = database
         
 models = []
+
+class Sector(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    name = CharField(max_length=255, null=True)
+
+    class Meta:
+        db_table = 'sector'
+models.append(Sector)
+
+class Domain(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    name = CharField(max_length=255, null=True)
+    organization = CharField(max_length=255, null=True)
+    country = CharField(max_length=255, null=True)
+    services = CharField(max_length=255, null=True)
+    project_state =CharField(max_length=255, null=True)
+    
+    attributes = HStoreField(null=True)
+    sector = ForeignKeyField(db_column='sector_id',  rel_model=Sector, related_name='domains', null=True)
+
+    class Meta:
+        db_table = 'domain'
+models.append(Domain)
+
+class Subsector(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    name = CharField(max_length=255, null=True)
+    sector = ForeignKeyField(db_column='sector_id',  rel_model=Sector, related_name='subsectors', null=True)
+
+    class Meta:
+        db_table = 'subsector'
+models.append(Subsector)
+
+class DomainSubsector(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='domain-subsectors')
+    subsector = ForeignKeyField(db_column='subsector_id', null=True, rel_model=Subsector, related_name='domain-subsectors')
+
+    class Meta:
+        db_table = 'subsector'
+models.append(Subsector)
 
 class User(BaseModel):
     id = PrimaryKeyField(db_column='id')

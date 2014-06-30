@@ -23,29 +23,19 @@ class CommCareExportImporter(importer.Importer):
     '''
     An importer that uses commcare-export
     '''
-    
-    _hstore_col_name = None
-    _incoming_table_class = None
 
-    def __init__(self, api_client):
+    def __init__(self, incoming_table_class, api_client):
         '''
         Constructor
         '''
         self.api_client = api_client
+        self._incoming_table_class = incoming_table_class
         
-        super(CommCareExportImporter, self).__init__()
+        super(CommCareExportImporter, self).__init__(self._incoming_table_class)
     
     @property
     def _get_query(self):
         pass
-    
-    @property
-    def _get_db_cols(self):
-        return [v.db_column for v in self._incoming_table_class._meta.fields.values()]
-    
-    @property
-    def _get_table_name(self):
-        return self._incoming_table_class._meta.db_table
     
     def do_import(self):
         
@@ -64,7 +54,7 @@ class CommCareExportImporter(importer.Importer):
             with writer:
                 for table in env.emitted_tables():
                     if table['name'] == self._get_table_name:
-                        writer.write_table(table, self._get_db_cols, self._hstore_col_name)
+                        writer.write_table(table, self._get_attribute_db_cols, self._get_hstore_db_col)
               
         else:
             logger.warn('no table emitted with name %s' % self._get_table_name)

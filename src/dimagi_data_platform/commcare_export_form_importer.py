@@ -14,7 +14,7 @@ class CommCareExportFormImporter(commcare_export_importer.CommCareExportImporter
     '''
     An importer for cases
     '''
-    _hstore_col_name = None
+
     _incoming_table_class = IncomingForm
     
     def __init__(self, api_client):
@@ -23,7 +23,7 @@ class CommCareExportFormImporter(commcare_export_importer.CommCareExportImporter
         '''
         self.api_client = api_client
         
-        super(CommCareExportFormImporter, self).__init__(self.api_client)
+        super(CommCareExportFormImporter, self).__init__(self._incoming_table_class,self.api_client)
     
     @property
     def _get_query(self):

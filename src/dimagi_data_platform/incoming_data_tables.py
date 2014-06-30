@@ -6,6 +6,7 @@ Created on Jun 23, 2014
 
 
 from peewee import Model, CharField, drop_model_tables, PrimaryKeyField
+from playhouse.postgres_ext import *
 
 from dimagi_data_platform import conf
 
@@ -20,9 +21,16 @@ class BaseModel(Model):
         
 models = []
 
+class IncomingDomain(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    attributes = HStoreField()
+
+    class Meta:
+        db_table = 'incoming_domain'
+
 class IncomingCases(BaseModel):
     id = PrimaryKeyField(db_column='id')
-    api = CharField(db_column='api_id', max_length=255, null=True)
+    api = CharField(db_column='ihK88ODLqyKDapi_id', max_length=255, null=True)
     case = CharField(db_column='case_id', max_length=255, null=True)
     case_type = CharField(max_length=255, null=True)
     closed = CharField(max_length=255, null=True)

@@ -16,8 +16,9 @@ from dimagi_data_platform.caseevent_table_updater import CaseEventTableUpdater
 from dimagi_data_platform.cases_table_updater import CasesTableUpdater
 from dimagi_data_platform.commcare_export_case_importer import CommCareExportCaseImporter
 from dimagi_data_platform.commcare_export_form_importer import CommCareExportFormImporter
-
+from dimagi_data_platform.excel_importer import ExcelImporter
 from dimagi_data_platform.form_table_updater import FormTableUpdater
+from dimagi_data_platform.incoming_data_tables import IncomingDomain
 from dimagi_data_platform.user_table_updater import UserTableUpdater
 from dimagi_data_platform.visit_table_updater import VisitTableUpdater
 
@@ -52,6 +53,7 @@ def main():
             importers = []
             importers.append(CommCareExportCaseImporter(api_client))
             importers.append(CommCareExportFormImporter(api_client))
+            importers.append(ExcelImporter(IncomingDomain,"domains.xlsx"))
         
             for importer in importers:
                 importer.do_import()

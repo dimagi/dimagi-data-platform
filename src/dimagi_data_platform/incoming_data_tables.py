@@ -35,6 +35,23 @@ class IncomingDomain(BaseModel):
 
     class Meta:
         db_table = 'incoming_domain'
+models.append(IncomingDomain)
+        
+class IncomingDomainAnnotation(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    attributes = HStoreField()
+
+    class Meta:
+        db_table = 'incoming_domain_annotation'
+models.append(IncomingDomainAnnotation)
+        
+class IncomingFormAnnotation(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    attributes = HStoreField()
+
+    class Meta:
+        db_table = 'incoming_form_annotation'
+models.append(IncomingFormAnnotation)
 
 class IncomingCases(BaseModel):
     id = PrimaryKeyField(db_column='id')

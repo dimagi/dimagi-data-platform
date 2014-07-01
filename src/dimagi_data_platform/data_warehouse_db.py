@@ -38,21 +38,6 @@ class Sector(BaseModel):
         db_table = 'sector'
 models.append(Sector)
 
-class Domain(BaseModel):
-    id = PrimaryKeyField(db_column='id')
-    name = CharField(max_length=255, null=True)
-    organization = CharField(max_length=255, null=True)
-    country = CharField(max_length=255, null=True)
-    services = CharField(max_length=255, null=True)
-    project_state =CharField(max_length=255, null=True)
-    
-    attributes = HStoreField(null=True)
-    sector = ForeignKeyField(db_column='sector_id',  rel_model=Sector, related_name='domains', null=True)
-
-    class Meta:
-        db_table = 'domain'
-models.append(Domain)
-
 class Subsector(BaseModel):
     id = PrimaryKeyField(db_column='id')
     name = CharField(max_length=255, null=True)
@@ -62,14 +47,59 @@ class Subsector(BaseModel):
         db_table = 'subsector'
 models.append(Subsector)
 
+class Domain(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    name = CharField(max_length=255, null=True)
+    organization = CharField(max_length=255, null=True)
+    country = CharField(max_length=255, null=True)
+    services = CharField(max_length=255, null=True)
+    project_state =CharField(max_length=255, null=True)
+    business_unit =CharField(max_length=255, null=True)
+    
+    attributes = HStoreField(null=True)
+    class Meta:
+        db_table = 'domain'
+models.append(Domain)
+
+class DomainSector(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='domain-sectors')
+    sector = ForeignKeyField(db_column='sector_id', null=True, rel_model=Sector, related_name='domain-sectors')
+
+    class Meta:
+        db_table = 'domain_sector'
+models.append(DomainSector)
+
 class DomainSubsector(BaseModel):
     id = PrimaryKeyField(db_column='id')
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='domain-subsectors')
     subsector = ForeignKeyField(db_column='subsector_id', null=True, rel_model=Subsector, related_name='domain-subsectors')
 
     class Meta:
-        db_table = 'subsector'
-models.append(Subsector)
+        db_table = 'domain_subsector'
+models.append(DomainSubsector)
+
+class FormDefinition(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    xmlns = CharField(max_length=255, null=True)
+    app_id = CharField(max_length=255, null=True)
+    
+    attributes = HStoreField(null=True)
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='formdefs')
+    sector = ForeignKeyField(db_column='sector_id',  rel_model=Sector, related_name='formdefs', null=True)
+
+    class Meta:
+        db_table = 'formdef'
+models.append(FormDefinition)
+
+class FormDefinitionSubsector(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    formdef = ForeignKeyField(db_column='formdef_id', null=True, rel_model=Domain, related_name='formdef-subsectors')
+    subsector = ForeignKeyField(db_column='subsector_id', null=True, rel_model=Subsector, related_name='formdef-subsectors')
+
+    class Meta:
+        db_table = 'formdef_subsector'
+models.append(FormDefinitionSubsector)
 
 class User(BaseModel):
     id = PrimaryKeyField(db_column='id')

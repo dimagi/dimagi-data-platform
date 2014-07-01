@@ -19,9 +19,12 @@ from dimagi_data_platform.commcare_export_form_importer import CommCareExportFor
 from dimagi_data_platform.domain_table_updater import DomainTableUpdater
 from dimagi_data_platform.excel_importer import ExcelImporter
 from dimagi_data_platform.form_table_updater import FormTableUpdater
-from dimagi_data_platform.incoming_data_tables import IncomingDomain
+from dimagi_data_platform.formdef_table_updater import FormDefTableUpdater
+from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
+    IncomingDomainAnnotation, IncomingFormAnnotation
 from dimagi_data_platform.user_table_updater import UserTableUpdater
 from dimagi_data_platform.visit_table_updater import VisitTableUpdater
+
 
 logger = logging.getLogger('dimagi_data_platform')
 
@@ -44,6 +47,8 @@ def update_platform_data():
     '''
     importers = []
     importers.append(ExcelImporter(IncomingDomain,"domains.xlsx"))
+    importers.append(ExcelImporter(IncomingDomainAnnotation,"domain_annotations.xlsx"))
+    importers.append(ExcelImporter(IncomingFormAnnotation,"form_annotations.xlsx"))
     
     for importer in importers:
         importer.do_import()
@@ -52,6 +57,7 @@ def update_platform_data():
         LoggingConnection.initialize(dbconn,logger)
         table_updaters = []
         table_updaters.append(DomainTableUpdater(dbconn))
+        table_updaters.append(FormDefTableUpdater(dbconn))
         
         for table_updater in table_updaters:
             table_updater.update_table()

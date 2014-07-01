@@ -1,14 +1,17 @@
 library(RPostgreSQL)
 
+get_con <- function(user,pass,host,port, dbname) {
 drv <- dbDriver("PostgreSQL")
+# read DB conn properties from config file
+con <- dbConnect(drv, dbname=dbname,
+                 user=user,
+                 pass=pass,
+                 host=host, 
+                 port=port)
+return(con)
+}
 
-# should read DB conn properties from config file
-con <- dbConnect(drv, dbname=conf$database$dbname,
-                 user=conf$database$user,
-                 pass=conf$database$pass,
-                 host=conf$database$host, 
-                 port=conf$database$port)
-
+get_interaction_table <- function (con) {
 domain_list <- paste(lapply(conf$domains$name,sprintf,fmt="'%s'"),sep=" ", collapse=",")
 query <- sprintf("with a as 
                  (select visit_id, count (distinct form_id) as total_forms 
@@ -33,3 +36,10 @@ query <- sprintf("with a as
 
 rs <- dbSendQuery(con,query)
 v <- fetch(rs,n=-1)
+dbClearResult(rs)
+return(v)
+}
+
+close_con <- function (con,drv) {
+dbDisconnect(con)
+}

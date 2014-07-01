@@ -5,24 +5,39 @@ library(plyr)
 library(timeDate)
 library(reshape2)
 
-# get r script path and config file path as command line args
-args <- commandArgs(trailingOnly = TRUE)
+# should the script use a csv file for testing instead of a database query?
+use_csv <- TRUE
+csv_filename <- "/home/mel/Documents/2013-2014/dimagi/data_platform_R/first run sample data for mengji/interaction_table_sample2.csv"
 
+# get command line args (passed to Rscript)
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args)==0){
+  print('warning, no command line args')
+  args<-vector()
+  args[1]<-'/home/mel/workspace/dimagi-data-platform/src/R'
+  args[2]<-'/home/mel/workspace/dimagi-data-platform/src'
+}
 r_script_path <- args[1] # where to find the other scripts we're sourcing
 config_path <- args[2] # where to find config.json
 
 # get the config parameters
-config_file = file.path(config_path,"config.json", fsep = .Platform$file.sep)
-library("jsonlite")
-conf<-fromJSON(config_file)$data_platform
+source (file.path(r_script_path,"data_platform_funcs.R", fsep = .Platform$file.sep))
+conf <- get_config(config_path)
 
-# get data source
-# a database query
-data_source_loader = file.path(r_script_path,"db_source_mobile_user_tables.R", fsep = .Platform$file.sep)
-
-# or just a csv file of results, for testing
-# data_source_loader = file.path(r_script_path,"csv_source_mobile_user_tables.R", fsep = .Platform$file.sep)
-source(data_source_loader,chdir=T)
+if (use_csv == TRUE) {
+  # get data from a csv file
+  source(file.path(r_script_path,"csv_sources.R", fsep = .Platform$file.sep),chdir=T)
+  v<-get_interaction_table_from_csv(csv_filename)
+} else {
+  # get data from a database query
+  source(file.path(r_script_path,"db_queries.R", fsep = .Platform$file.sep),chdir=T)
+  con <- get_con(dbname=conf$database$dbname,
+                 user=conf$database$user,
+                 pass=conf$database$pass,
+                 host=conf$database$host, 
+                 port=conf$database$port)
+  v <- get_interaction_table(con)
+}
 
 setwd(conf$directories$output)
 

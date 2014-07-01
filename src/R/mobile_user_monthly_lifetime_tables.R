@@ -6,7 +6,7 @@ library(timeDate)
 library(reshape2)
 
 # should the script use a csv file for testing instead of a database query?
-use_csv <- TRUE
+use_csv <- FALSE
 csv_filename <- "/home/mel/Documents/2013-2014/dimagi/data_platform_R/first run sample data for mengji/interaction_table_sample2.csv"
 
 # get command line args (passed to Rscript)

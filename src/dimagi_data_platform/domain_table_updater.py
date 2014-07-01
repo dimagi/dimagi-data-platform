@@ -3,11 +3,15 @@ Created on Jun 17, 2014
 
 @author: mel
 '''
+import logging
+
 from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation
 from dimagi_data_platform.standard_table_updater import StandardTableUpdater
 
+
+logger = logging.getLogger(__name__)
 
 class DomainTableUpdater(StandardTableUpdater):
     '''

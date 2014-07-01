@@ -8,22 +8,8 @@ Created on Jun 17, 2014
 from peewee import prefetch
 
 from dimagi_data_platform.data_warehouse_db import User, Form, CaseEvent, Cases, \
-    Visit, Interaction, FormVisit
+    Visit, Interaction, FormVisit, Domain
 from dimagi_data_platform.standard_table_updater import StandardTableUpdater
-
-home_visit_forms = set(['http://openrosa.org/formdesigner/E41E21BB-32F9-435B-A3E9-BEB08C4743A1',
-'http://openrosa.org/formdesigner/0FA17225-70BC-4284-A38B-6C4E16E6CA4F',
-'http://openrosa.org/formdesigner/4A49479F-BEBD-498D-A08B-4F0EAAD4DDBB',
-'http://openrosa.org/formdesigner/FDD31334-4885-4C31-AEA4-59547CCC5C9E',
-'http://openrosa.org/formdesigner/93BC80C0-E9EC-4A0E-BDE0-ACE69CB30B88',
-'http://openrosa.org/formdesigner/63866D7C-42FC-43DD-8EFA-E02C74729DD6',
-'http://openrosa.org/formdesigner/5314838B-00ED-4556-A656-100EAFD0603F',
-'http://openrosa.org/formdesigner/EF241BF0-6230-4390-A8BE-31803E7A135E',
-'http://openrosa.org/formdesigner/a6fafcf2cc3e280533aa0325b513d73f3c41c4ef',
-'http://openrosa.org/formdesigner/AC501474-0BA9-4915-9A8C-A8A8F6C57BFF',
-'http://openrosa.org/formdesigner/EA8FB6FC-E269-440F-993E-AD07F733BF31',
-'http://openrosa.org/formdesigner/fa8deed6f9b7c955a077e987a919e2815cf2afa5',
-'http://openrosa.org/formdesigner/36c07ca15eb402fb6ba3cedd709c6ce7e1e83685'])
 
 
 class VisitTableUpdater(StandardTableUpdater):
@@ -35,7 +21,9 @@ class VisitTableUpdater(StandardTableUpdater):
         '''
         Constructor
         '''
-        self.domain = domain
+        self.domain = Domain.get(name=domain)   
+        self.home_visit_forms = [(fdef.xmlns,fdef.app_id) for fdef in self.domain.formdefs if fdef.attributes['Travel visit']=='Yes']
+       
         super(VisitTableUpdater, self).__init__(dbconn)
         
     def create_visit(self, user, visited_forms, visited_cases):
@@ -52,7 +40,7 @@ class VisitTableUpdater(StandardTableUpdater):
             v.form_duration = v.form_duration + (fp.time_end - fp.time_start).total_seconds()
             fv = FormVisit.create(visit=v, form=fp)
             
-            if fp.xmlns in home_visit_forms:
+            if (fp.xmlns, fp.app) in self.home_visit_forms:
                 v.home_visit = True
         
         v.time_start = min(visited_forms, key=lambda x : x.time_start).time_start
@@ -72,7 +60,7 @@ class VisitTableUpdater(StandardTableUpdater):
         ces = CaseEvent.select().join(Cases)
         
         users_prefetch = prefetch(users, forms, ces)
-        
+         
         for u in users_prefetch:
             print("GETTING VISITS FOR USER %s" % u.user)
             prev_visited_forms = []

@@ -104,7 +104,7 @@ models.append(FormDefinitionSubsector)
 class User(BaseModel):
     id = PrimaryKeyField(db_column='id')
     user = CharField(db_column='user_id', max_length=255, null=True)
-    domain = CharField(db_column='domain', max_length=255)
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='users')
 
     class Meta:
         db_table = 'users'
@@ -118,7 +118,7 @@ class Form(BaseModel):
     time_start = DateTimeField(null=True)
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms', on_delete='CASCADE')
     xmlns = CharField(max_length=255, null=True)
-    domain = CharField(db_column='domain', max_length=255)
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='forms')
 
     class Meta:
         db_table = 'form'
@@ -135,7 +135,7 @@ class Cases(BaseModel):
     owner = ForeignKeyField(db_column='owner_id', null=True, rel_model=User, related_name='owned_cases', on_delete='CASCADE')
     parent = CharField(db_column='parent_id', max_length=255, null=True)
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='user_cases', on_delete='CASCADE')
-    domain = CharField(db_column='domain', max_length=255)
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='cases')
 
     class Meta:
         db_table = 'cases'

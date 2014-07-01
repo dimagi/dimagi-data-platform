@@ -69,11 +69,9 @@ def run_for_domains(domainlist, password):
         importers = []
         importers.append(CommCareExportCaseImporter(api_client))
         importers.append(CommCareExportFormImporter(api_client))
-        importers.append(ExcelImporter(IncomingDomain,"domains.xlsx"))
     
         for importer in importers:
             importer.do_import()
-        
         
         with LoggingConnection(conf.PSYCOPG_RAW_CON) as dbconn:
             LoggingConnection.initialize(dbconn,logger)

@@ -5,6 +5,7 @@ Created on Jun 17, 2014
 '''
 
 
+from dimagi_data_platform.data_warehouse_db import Domain
 from dimagi_data_platform.standard_table_updater import StandardTableUpdater
 
 
@@ -17,17 +18,19 @@ class UserTableUpdater(StandardTableUpdater):
         '''
         Constructor
         '''
-        self.domain = domain
+        self.domain = Domain.get(name=domain)
         super(UserTableUpdater, self).__init__(dbconn)
         
     def update_table(self):
         with self.conn.cursor() as curs:
-            curs.execute("delete from users where domain like '%s'" % self.domain)
+            curs.execute("delete from users where domain_id = '%d'" % self.domain.id)
 
-            curs.execute("insert into users(user_id,domain) "
-                             "(select user_id, domain from incoming_cases where domain like '%s' union select user_id, domain "
-                             "from incoming_form where domain like '%s' union "
-                             "select owner_id, domain from incoming_cases where domain like '%s');" % (self.domain,self.domain,self.domain))
+            curs.execute("insert into users(user_id,domain_id) "
+                             "(select user_id, domain.id from incoming_cases, domain where domain.name like incoming_cases.domain "
+                             " and domain.id ='%d' union select user_id, domain.id "
+                             "from incoming_cases,domain where domain.name like incoming_cases.domain and domain.id='%d' union "
+                             "select owner_id, domain.id from incoming_cases, domain "
+                             "where domain.name like incoming_cases.domain and domain.id='%d');" % (self.domain.id,self.domain.id,self.domain.id))
 
         
         

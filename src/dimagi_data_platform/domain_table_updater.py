@@ -65,8 +65,12 @@ class DomainTableUpdater(StandardTableUpdater):
                     except Sector.DoesNotExist:
                         sec = Sector(name=secname)
                         sec.save()
-                    ds = DomainSector(domain=domain, sector=sec)
-                    ds.save()
+                    try:
+                        ds = DomainSector.get(domain=domain, sector=sec)
+                    except DomainSector.DoesNotExist:
+                        ds = DomainSector(domain=domain, sector=sec)
+                        ds.save()
+            
             except Domain.DoesNotExist:
                 logger.warn('Domain referenced i domain annotations table with name %s, does not exist' % (dname))
 

@@ -1,4 +1,5 @@
 library(RPostgreSQL)
+library(reshape2)
 
 get_con <- function(user,pass,host,port, dbname) {
 drv <- dbDriver("PostgreSQL")
@@ -11,7 +12,58 @@ con <- dbConnect(drv, dbname=dbname,
 return(con)
 }
 
-get_interaction_table <- function (con, doamin_list) {
+# returns all attributes for domains in domain_list, sector and subsector names as lists
+get_domain_table <- function (con, domain_list) {
+  normal_cols_q <- sprintf("select * from domain 
+                 where domain.name in (%s) 
+                 order by name", domain_list)
+  rs <- dbSendQuery(con,normal_cols_q)
+  normal_cols <- fetch(rs,n=-1)
+  dbClearResult(rs)
+  retframe<-normal_cols[, !(colnames(normal_cols) %in% c("attributes"))]
+  
+  hstore_keyvalues_q <- sprintf("select name, (each(attributes)).* from domain 
+                 where domain.name in (%s) 
+                 order by name", domain_list)
+  rs <- dbSendQuery(con,hstore_keyvalues_q)
+  hstore_keyvalues <- fetch(rs,n=-1)
+  dbClearResult(rs)
+  hstore_wide<-dcast(hstore_keyvalues, name ~ key)
+  retframe<-merge(retframe,hstore_wide,by="name")
+  
+  sectors_q <- sprintf("select domain.name, 
+              array(select sector.name 
+              from sector, domain_sector 
+              where domain_sector.domain_id = domain.id 
+              and domain_sector.sector_id=sector.id) as sector_arr
+              from domain
+
+              order by domain.name", domain_list)
+  rs <- dbSendQuery(con,sectors_q)
+  sectors <- fetch(rs,n=-1)
+  dbClearResult(rs)
+  sectors<-transform(sectors, sector_arr = strsplit(substr(sector_arr,2,nchar(sector_arr)-1),split=","))
+  sectors$sector_arr[sapply(sectors$sector_arr,length)==0]<-NA
+  retframe<-merge(retframe,sectors,by="name")
+  
+  subsectors_q <- sprintf("select domain.name, 
+              array(select subsector.name 
+              from subsector, domain_subsector 
+              where domain_subsector.domain_id = domain.id 
+              and domain_subsector.subsector_id=subsector.id) as subsector_arr
+              from domain
+              where domain.name in (%s)
+              order by domain.name", domain_list)
+  rs <- dbSendQuery(con,subsectors_q)
+  subsectors <- fetch(rs,n=-1)
+  dbClearResult(rs)
+  subsectors<-transform(subsectors, subsector_arr = strsplit(substr(subsector_arr,2,nchar(subsector_arr)-1),split=","))
+  subsectors$subsector_arr[sapply(subsectors$subsector_arr,length)==0]<-NA
+  retframe<-merge(retframe,subsectors,by="name")
+  return(retframe)
+}
+
+get_interaction_table <- function (con, domain_list) {
 query <- sprintf("with a as 
                  (select visit_id, count (distinct form_id) as total_forms 
                  from form_visit 

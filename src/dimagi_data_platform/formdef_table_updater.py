@@ -48,8 +48,12 @@ class FormDefTableUpdater(StandardTableUpdater):
                     except Subsector.DoesNotExist:
                         sub = Subsector(name=sname)
                         sub.save()
-                    fs = FormDefinitionSubsector(fd, sub)
-                    fs.save()
+                    
+                    try:
+                        fs = FormDefinitionSubsector.get(formdef=fd, subsector=sub)     
+                    except FormDefinitionSubsector.DoesNotExist:
+                        fs = FormDefinitionSubsector(formdef=fd, subsector=sub)
+                        fs.save()
                     
             except Domain.DoesNotExist:
                 logger.warn('Domain with name %s does not exist, could not add Form Definition with xmlns %s and app ID %s' % (dname, xmlns, app_id))

@@ -39,6 +39,6 @@ dbClearResult(rs)
 return(v)
 }
 
-close_con <- function (con,drv) {
+close_con <- function (con) {
 dbDisconnect(con)
 }

@@ -39,6 +39,7 @@ if (use_csv == TRUE) {
                  host=conf$database$host, 
                  port=conf$database$port)
   v <- get_interaction_table(con, domain_list)
+  close_con(con)
 }
 
 setwd(conf$directories$output)

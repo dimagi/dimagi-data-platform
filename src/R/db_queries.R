@@ -11,8 +11,7 @@ con <- dbConnect(drv, dbname=dbname,
 return(con)
 }
 
-get_interaction_table <- function (con) {
-domain_list <- paste(lapply(conf$domains$name,sprintf,fmt="'%s'"),sep=" ", collapse=",")
+get_interaction_table <- function (con, doamin_list) {
 query <- sprintf("with a as 
                  (select visit_id, count (distinct form_id) as total_forms 
                  from form_visit 

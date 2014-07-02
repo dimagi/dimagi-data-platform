@@ -29,9 +29,9 @@ from dimagi_data_platform.visit_table_updater import VisitTableUpdater
 
 logger = logging.getLogger('dimagi_data_platform')
 
-def run_proccess_and_log(cmd,args_list):
-    proc_list = [cmd]+ args_list
-    proc=subprocess.Popen(proc_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def run_proccess_and_log(cmd, args_list):
+    proc_list = [cmd] + args_list
+    proc = subprocess.Popen(proc_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = proc.communicate()
     if stdout:
         logger.info(stdout)
@@ -47,15 +47,15 @@ def update_platform_data():
     update from master lists of domains, forms etc
     '''
     importers = []
-    importers.append(ExcelImporter(IncomingDomain,"domains.xlsx"))
-    importers.append(ExcelImporter(IncomingDomainAnnotation,"domain_annotations.xlsx"))
-    importers.append(ExcelImporter(IncomingFormAnnotation,"form_annotations.xlsx"))
+    importers.append(ExcelImporter(IncomingDomain, "domains.xlsx"))
+    importers.append(ExcelImporter(IncomingDomainAnnotation, "domain_annotations.xlsx"))
+    importers.append(ExcelImporter(IncomingFormAnnotation, "form_annotations.xlsx"))
     
     for importer in importers:
         importer.do_import()
     
     with LoggingConnection(conf.PSYCOPG_RAW_CON) as dbconn:
-        LoggingConnection.initialize(dbconn,logger)
+        LoggingConnection.initialize(dbconn, logger)
         table_updaters = []
         table_updaters.append(DomainTableUpdater(dbconn))
         table_updaters.append(FormDefTableUpdater(dbconn))
@@ -65,7 +65,7 @@ def update_platform_data():
             
 def run_for_domains(domainlist, password):
     for domain in domainlist:
-        api_client = CommCareHqClient('https://www.commcarehq.org',domain).authenticated(conf.CC_USER,password )
+        api_client = CommCareHqClient('https://www.commcarehq.org', domain).authenticated(conf.CC_USER, password)
         
         importers = []
         importers.append(CommCareExportCaseImporter(api_client))
@@ -75,17 +75,17 @@ def run_for_domains(domainlist, password):
             importer.do_import()
         
         with LoggingConnection(conf.PSYCOPG_RAW_CON) as dbconn:
-            LoggingConnection.initialize(dbconn,logger)
+            LoggingConnection.initialize(dbconn, logger)
             table_updaters = []
-            table_updaters.append(UserTableUpdater(dbconn,domain))
-            table_updaters.append(FormTableUpdater(dbconn,domain))
-            table_updaters.append(CasesTableUpdater(dbconn,domain))
-            table_updaters.append(CaseEventTableUpdater(dbconn,domain))
+            table_updaters.append(UserTableUpdater(dbconn, domain))
+            table_updaters.append(FormTableUpdater(dbconn, domain))
+            table_updaters.append(CasesTableUpdater(dbconn, domain))
+            table_updaters.append(CaseEventTableUpdater(dbconn, domain))
             
             for table_updater in table_updaters:
                 table_updater.update_table()
         
-        vt = VisitTableUpdater(dbconn,domain)
+        vt = VisitTableUpdater(dbconn, domain)
         vt.update_table()
 
 def main():
@@ -103,9 +103,9 @@ def main():
         conf_path = os.path.abspath('.')
         
         for report in conf.REPORTS:
-            run_proccess_and_log('Rscript',[os.path.join(r_script_path,'%s.R' % report), r_script_path, conf_path])
+            run_proccess_and_log('Rscript', [os.path.join(r_script_path, '%s.R' % report), r_script_path, conf_path, ','.join(["'%s'" % n for n in domain_list])])
         
-        run_proccess_and_log('aws',['s3','sync',conf.OUTPUT_DIR,conf.AWS_S3_OUTPUT_URL])
+        run_proccess_and_log('aws', ['s3', 'sync', conf.OUTPUT_DIR, conf.AWS_S3_OUTPUT_URL])
     
 if __name__ == '__main__':
     main()

@@ -16,9 +16,11 @@ if (length(args)==0){
   args<-vector()
   args[1]<-'/home/mel/workspace/dimagi-data-platform/src/R'
   args[2]<-'/home/mel/workspace/dimagi-data-platform/src'
+  args[3]<-"'melissa-test-project'"# domains, comma-separated and surrounded by single quotes
 }
 r_script_path <- args[1] # where to find the other scripts we're sourcing
 config_path <- args[2] # where to find config.json
+domain_list <- args[3]
 
 # get the config parameters
 source (file.path(r_script_path,"data_platform_funcs.R", fsep = .Platform$file.sep))
@@ -36,7 +38,7 @@ if (use_csv == TRUE) {
                  pass=conf$database$pass,
                  host=conf$database$host, 
                  port=conf$database$port)
-  v <- get_interaction_table(con)
+  v <- get_interaction_table(con, domain_list)
 }
 
 setwd(conf$directories$output)

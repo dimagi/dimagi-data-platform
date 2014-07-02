@@ -62,7 +62,7 @@ def get_domains(domain_conf_json):
                     filter_domains.extend([v.name for v in val_domains])
             
             filter_lists.append(filter_domains)
-            
-        domains.extend(set(filter_lists[0]).intersection(*filter_lists))
+        if filter_lists:
+            domains.extend(set(filter_lists[0]).intersection(*filter_lists))
     
     return list(set(domains))

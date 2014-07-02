@@ -1,3 +1,5 @@
 /config.py
 /local_config.py
 /config.json
+/config_example_all.json
+/config_example_filters.json

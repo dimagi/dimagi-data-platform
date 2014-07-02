@@ -11,8 +11,7 @@ import subprocess
 from commcare_export.commcare_hq_client import CommCareHqClient
 from psycopg2.extras import LoggingConnection
 
-from dimagi_data_platform import data_warehouse_db, incoming_data_tables, conf, \
-    domain_filter
+from dimagi_data_platform import data_warehouse_db, incoming_data_tables, conf
 from dimagi_data_platform.caseevent_table_updater import CaseEventTableUpdater
 from dimagi_data_platform.cases_table_updater import CasesTableUpdater
 from dimagi_data_platform.commcare_export_case_importer import CommCareExportCaseImporter

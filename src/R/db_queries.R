@@ -3,7 +3,7 @@ library(reshape2)
 
 get_con <- function(user,pass,host,port, dbname) {
 drv <- dbDriver("PostgreSQL")
-# read DB conn properties from config file
+
 con <- dbConnect(drv, dbname=dbname,
                  user=user,
                  pass=pass,
@@ -63,6 +63,7 @@ get_domain_table <- function (con, domain_list) {
   return(retframe)
 }
 
+# interaction table (one row for each visit to a case, visit to two cases = two rows)
 get_interaction_table <- function (con, domain_list) {
 query <- sprintf("with a as 
                  (select visit_id, count (distinct form_id) as total_forms 

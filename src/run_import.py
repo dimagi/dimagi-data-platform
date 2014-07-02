@@ -12,19 +12,14 @@ from commcare_export.commcare_hq_client import CommCareHqClient
 from psycopg2.extras import LoggingConnection
 
 from dimagi_data_platform import data_warehouse_db, incoming_data_tables, conf
-from dimagi_data_platform.caseevent_table_updater import CaseEventTableUpdater
-from dimagi_data_platform.cases_table_updater import CasesTableUpdater
-from dimagi_data_platform.commcare_export_case_importer import CommCareExportCaseImporter
-from dimagi_data_platform.commcare_export_form_importer import CommCareExportFormImporter
-from dimagi_data_platform.domain_table_updater import DomainTableUpdater
-from dimagi_data_platform.excel_importer import ExcelImporter
-from dimagi_data_platform.form_table_updater import FormTableUpdater
-from dimagi_data_platform.formdef_table_updater import FormDefTableUpdater
+from dimagi_data_platform.importers import ExcelImporter, \
+    CommCareExportCaseImporter, CommCareExportFormImporter
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation
-from dimagi_data_platform.user_table_updater import UserTableUpdater
+from dimagi_data_platform.standard_table_updaters import DomainTableUpdater, \
+    UserTableUpdater, FormTableUpdater, CasesTableUpdater, CaseEventTableUpdater, \
+    VisitTableUpdater, FormDefTableUpdater
 from dimagi_data_platform.utils import get_domains
-from dimagi_data_platform.visit_table_updater import VisitTableUpdater
 
 
 logger = logging.getLogger('dimagi_data_platform')

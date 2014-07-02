@@ -11,7 +11,8 @@ import subprocess
 from commcare_export.commcare_hq_client import CommCareHqClient
 from psycopg2.extras import LoggingConnection
 
-from dimagi_data_platform import data_warehouse_db, incoming_data_tables, conf
+from dimagi_data_platform import data_warehouse_db, incoming_data_tables, conf, \
+    domain_filter
 from dimagi_data_platform.caseevent_table_updater import CaseEventTableUpdater
 from dimagi_data_platform.cases_table_updater import CasesTableUpdater
 from dimagi_data_platform.commcare_export_case_importer import CommCareExportCaseImporter
@@ -23,6 +24,7 @@ from dimagi_data_platform.formdef_table_updater import FormDefTableUpdater
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation
 from dimagi_data_platform.user_table_updater import UserTableUpdater
+from dimagi_data_platform.utils import get_domains
 from dimagi_data_platform.visit_table_updater import VisitTableUpdater
 
 
@@ -92,7 +94,11 @@ def main():
         password = getpass.getpass()
         
         update_platform_data()
-        run_for_domains(conf.DOMAINS, password)
+        domain_list = get_domains(conf.DOMAIN_CONF_JSON)
+        print 'domains for run are: %s' % ','.join(domain_list)
+        logger.info('domains for run are: %s' % ','.join(domain_list))
+        
+        run_for_domains(domain_list, password)
         
         r_script_path = os.path.abspath('R/')
         conf_path = os.path.abspath('.')

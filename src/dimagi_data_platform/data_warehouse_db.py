@@ -63,8 +63,8 @@ models.append(Domain)
 
 class DomainSector(BaseModel):
     id = PrimaryKeyField(db_column='id')
-    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='domain-sectors')
-    sector = ForeignKeyField(db_column='sector_id', null=True, rel_model=Sector, related_name='domain-sectors')
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='domainsectors')
+    sector = ForeignKeyField(db_column='sector_id', null=True, rel_model=Sector, related_name='domainsectors')
 
     class Meta:
         db_table = 'domain_sector'
@@ -72,8 +72,8 @@ models.append(DomainSector)
 
 class DomainSubsector(BaseModel):
     id = PrimaryKeyField(db_column='id')
-    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='domain-subsectors')
-    subsector = ForeignKeyField(db_column='subsector_id', null=True, rel_model=Subsector, related_name='domain-subsectors')
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='domainsubsectors')
+    subsector = ForeignKeyField(db_column='subsector_id', null=True, rel_model=Subsector, related_name='domainsubsectors')
 
     class Meta:
         db_table = 'domain_subsector'
@@ -94,8 +94,8 @@ models.append(FormDefinition)
 
 class FormDefinitionSubsector(BaseModel):
     id = PrimaryKeyField(db_column='id')
-    formdef = ForeignKeyField(db_column='formdef_id', null=True, rel_model=Domain, related_name='formdef-subsectors')
-    subsector = ForeignKeyField(db_column='subsector_id', null=True, rel_model=Subsector, related_name='formdef-subsectors')
+    formdef = ForeignKeyField(db_column='formdef_id', null=True, rel_model=Domain, related_name='formdefsubsectors')
+    subsector = ForeignKeyField(db_column='subsector_id', null=True, rel_model=Subsector, related_name='formdefsubsectors')
 
     class Meta:
         db_table = 'formdef_subsector'

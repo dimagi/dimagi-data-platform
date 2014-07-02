@@ -31,8 +31,6 @@ DB_PORT = _json_conf['database']['port']
 
 CC_USER = _json_conf['commcare_export']['username']
 
-DOMAINS = [d['name'] for d in _json_conf['domains']]
-
 # use paths for these or the R script won't find them
 TMP_FILES_DIR = _json_conf['directories']['tmp_files']
 OUTPUT_DIR = _json_conf['directories']['output']
@@ -41,6 +39,8 @@ INPUT_DIR = _json_conf['directories']['input']
 REPORTS = [r['name'] for r in _json_conf['reports']]
 
 AWS_S3_OUTPUT_URL = _json_conf['s3']['output_url']
+
+DOMAIN_CONF_JSON = _json_conf['domains']
 
 
 # THIS IS RIDICULOUS. PICK ONE.

@@ -111,6 +111,16 @@ class User(BaseModel):
         db_table = 'users'
 models.append(User)
 
+class Visit(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    time_end = DateTimeField(null=True)
+    time_start = DateTimeField(null=True)
+    home_visit = BooleanField(null=True)
+    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='visits', on_delete='CASCADE')
+    class Meta:
+        db_table = 'visit'
+models.append(Visit)
+
 class Form(BaseModel):
     id = PrimaryKeyField(db_column='id')
     app = CharField(db_column='app_id', max_length=255, null=True)
@@ -119,6 +129,8 @@ class Form(BaseModel):
     time_start = DateTimeField(null=True)
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms', on_delete='CASCADE')
     xmlns = CharField(max_length=255, null=True)
+    
+    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='forms')
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='forms')
 
     class Meta:
@@ -141,24 +153,12 @@ class Cases(BaseModel):
     class Meta:
         db_table = 'cases'
 models.append(Cases)
-
-class Visit(BaseModel):
-
-    time_end = DateTimeField(null=True)
-    time_start = DateTimeField(null=True)
-    home_visit = BooleanField(null=True)
-    user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='visits', on_delete='CASCADE')
-    visit = PrimaryKeyField(db_column='visit_id')
-
-    class Meta:
-        db_table = 'visit'
-models.append(Visit)
         
 class CaseEvent(BaseModel):
     id = PrimaryKeyField(db_column='id')
     case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='caseevents', on_delete='CASCADE')
     form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, related_name='caseevents', on_delete='CASCADE')
-    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='caseevents')
+
     class Meta:
         db_table = 'case_event'
 models.append(CaseEvent)

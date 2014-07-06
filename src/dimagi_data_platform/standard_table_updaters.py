@@ -23,8 +23,8 @@ class StandardTableUpdater(object):
     updates a standard table from one or more incoming data tables produced by the importers
     '''
     
-    def __init__(self, dbconn):
-        self.conn = dbconn
+    def __init__(self):
+        super(StandardTableUpdater, self).__init__()
     
     def update_table(self):
         pass
@@ -37,8 +37,8 @@ class DomainTableUpdater(StandardTableUpdater):
     
     _first_col_names_to_skip = ['Total', 'Mean', 'STD']
     
-    def __init__(self, dbconn):
-        super(DomainTableUpdater, self).__init__(dbconn)
+    def __init__(self):
+        super(DomainTableUpdater, self).__init__()
     
     def update_table(self):
         
@@ -96,8 +96,8 @@ class FormDefTableUpdater(StandardTableUpdater):
     updates the form definition table, plus subsectors
     '''
     
-    def __init__(self, dbconn):
-        super(FormDefTableUpdater, self).__init__(dbconn)
+    def __init__(self):
+        super(FormDefTableUpdater, self).__init__()
     
     def update_table(self):
         
@@ -141,12 +141,12 @@ class UserTableUpdater(StandardTableUpdater):
     updates the user table from incoming forms and cases
     '''
 
-    def __init__(self, dbconn, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''
         self.domain = Domain.get(name=domain)
-        super(UserTableUpdater, self).__init__(dbconn)
+        super(UserTableUpdater, self).__init__()
         
     def update_table(self):
         case_users = IncomingCases.select(IncomingCases.user).where(IncomingCases.domain == self.domain.name)
@@ -170,12 +170,12 @@ class CasesTableUpdater(StandardTableUpdater):
     TODO currently deletes and recreates all rows for a domain. should modify and add only new rows instead
     '''
 
-    def __init__(self, dbconn, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''
         self.domain = Domain.get(name=domain)
-        super(CasesTableUpdater, self).__init__(dbconn)
+        super(CasesTableUpdater, self).__init__()
         
     def update_table(self):
         inccases_q = IncomingCases.select().where(IncomingCases.domain == self.domain.name)
@@ -217,12 +217,12 @@ class FormTableUpdater(StandardTableUpdater):
     TODO currently deletes and recreates all rows for a domain. should modify and add only new rows instead
     '''
 
-    def __init__(self, dbconn, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''
         self.domain = Domain.get(name=domain)
-        super(FormTableUpdater, self).__init__(dbconn)
+        super(FormTableUpdater, self).__init__()
         
     def update_table(self):
         incform_q = IncomingForm.select().where(IncomingForm.domain == self.domain.name)
@@ -257,12 +257,12 @@ class CaseEventTableUpdater(StandardTableUpdater):
     TODO currently deletes and recreates all rows for a domain. should modify and add only new rows instead
     '''
 
-    def __init__(self, dbconn, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''
         self.domain = Domain.get(name=domain)
-        super(CaseEventTableUpdater, self).__init__(dbconn)
+        super(CaseEventTableUpdater, self).__init__()
         
     def update_table(self):
         
@@ -292,33 +292,29 @@ class VisitTableUpdater(StandardTableUpdater):
     TODO currently deletes and recreates all rows for a domain. should modify and add only new rows instead
     '''
 
-    def __init__(self, dbconn, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''
         self.domain = Domain.get(name=domain)   
         self.home_visit_forms = [(fdef.xmlns, fdef.app_id) for fdef in self.domain.formdefs if fdef.attributes['Travel visit'] == 'Yes']
        
-        super(VisitTableUpdater, self).__init__(dbconn)
+        super(VisitTableUpdater, self).__init__()
         
     def create_visit(self, user, visited_forms):
         
-        v = Visit(user=user)
-        ces = []
+        v = Visit.create(user=user)
         v.home_visit = False
         
         for fp in visited_forms:
-            ces = ces + fp.caseevents_prefetch
+            fp.visit = v
             if (fp.xmlns, fp.app) in self.home_visit_forms:
                 v.home_visit = True
+            fp.save()
         v.time_start = min(visited_forms, key=lambda x : x.time_start).time_start
         v.time_end = max(visited_forms, key=lambda x : x.time_end).time_end
      
         v.save()
-        for ce in ces:
-            ce.visit = v
-            ce.save()
-        logger.info('saved visit %d with %d caseevents and %d forms' % (v.visit, len(ces), len(visited_forms)))
         
     def update_table(self):
         

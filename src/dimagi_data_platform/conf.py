@@ -43,7 +43,5 @@ AWS_S3_OUTPUT_URL = _json_conf['s3']['output_url']
 DOMAIN_CONF_JSON = _json_conf['domains']
 
 
-# THIS IS RIDICULOUS. PICK ONE.
 SQLALCHEMY_DB_URL = 'postgresql://%s:%s@%s:%s/%s' % (DB_USER, DB_PASS, DB_HOST, DB_PORT, DB_NAME)
-PSYCOPG_RAW_CON = "dbname=%s user=%s password=%s host=%s port=%s" % (DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT)
 PEEWEE_DB_CON = PostgresqlExtDatabase(DB_NAME, **{'host': DB_HOST, 'password': DB_PASS, 'user': DB_USER, 'port':DB_PORT})

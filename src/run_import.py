@@ -10,7 +10,6 @@ import os
 import subprocess
 
 from commcare_export.commcare_hq_client import CommCareHqClient
-from psycopg2.extras import LoggingConnection
 
 from dimagi_data_platform import data_warehouse_db, incoming_data_tables, conf
 from dimagi_data_platform.data_warehouse_db import Domain
@@ -51,14 +50,12 @@ def update_platform_data():
     for importer in importers:
         importer.do_import()
     
-    with LoggingConnection(conf.PSYCOPG_RAW_CON) as dbconn:
-        LoggingConnection.initialize(dbconn, logger)
-        table_updaters = []
-        table_updaters.append(DomainTableUpdater(dbconn))
-        table_updaters.append(FormDefTableUpdater(dbconn))
+    table_updaters = []
+    table_updaters.append(DomainTableUpdater())
+    table_updaters.append(FormDefTableUpdater())
         
-        for table_updater in table_updaters:
-            table_updater.update_table()
+    for table_updater in table_updaters:
+        table_updater.update_table()
             
 def run_for_domains(domainlist, password):
     for dname in domainlist:
@@ -76,20 +73,16 @@ def run_for_domains(domainlist, password):
     
         for importer in importers:
             importer.do_import()
+
+        table_updaters = []
+        table_updaters.append(UserTableUpdater(dname))
+        table_updaters.append(FormTableUpdater(dname))
+        table_updaters.append(CasesTableUpdater(dname))
+        table_updaters.append(CaseEventTableUpdater(dname))
+        table_updaters.append(VisitTableUpdater(dname))
         
-        with LoggingConnection(conf.PSYCOPG_RAW_CON) as dbconn:
-            LoggingConnection.initialize(dbconn, logger)
-            table_updaters = []
-            table_updaters.append(UserTableUpdater(dbconn, dname))
-            table_updaters.append(FormTableUpdater(dbconn, dname))
-            table_updaters.append(CasesTableUpdater(dbconn, dname))
-            table_updaters.append(CaseEventTableUpdater(dbconn, dname))
-            
-            for table_updater in table_updaters:
-                table_updater.update_table()
-        
-        vt = VisitTableUpdater(dbconn, dname)
-        vt.update_table()
+        for table_updater in table_updaters:
+            table_updater.update_table()
         
 
 def main():

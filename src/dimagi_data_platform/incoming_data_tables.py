@@ -55,7 +55,7 @@ class IncomingFormAnnotation(BaseModel):
 models.append(IncomingFormAnnotation)
 
 class IncomingCases(BaseModel):
-    api = CharField(db_column='ihK88ODLqyKDapi_id', max_length=255, null=True)
+    api = CharField(db_column='api_id', max_length=255, null=True)
     case = CharField(db_column='case_id', max_length=255, null=True)
     case_type = CharField(max_length=255, null=True)
     closed = CharField(max_length=255, null=True)

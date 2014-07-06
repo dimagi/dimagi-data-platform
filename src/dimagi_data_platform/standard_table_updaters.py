@@ -152,7 +152,7 @@ class UserTableUpdater(StandardTableUpdater):
         case_users = IncomingCases.select(IncomingCases.user).where(IncomingCases.domain == self.domain.name)
         case_owners = IncomingCases.select(IncomingCases.owner).where(IncomingCases.domain == self.domain.name)
         form_users = IncomingForm.select(IncomingForm.user).where(IncomingForm.domain == self.domain.name)
-        incoming_user_ids = set([u.user for u in case_users]) & set([o.owner for o in case_owners]) & set([f.user for f in form_users])
+        incoming_user_ids = set([u.user for u in case_users]).union(set([o.owner for o in case_owners])).union(set([f.user for f in form_users]))
         
         for user_id in incoming_user_ids:
             try:
@@ -191,13 +191,12 @@ class CasesTableUpdater(StandardTableUpdater):
             if inccase.user in user_id_dict and inccase.owner in user_id_dict:
                 
                 # note different date formats for these
-                opened = datetime.datetime.strptime(inccase.date_opened, '%Y-%m-%dT%H:%M:%S')
-                modified = datetime.datetime.strptime(inccase.date_modified, '%Y-%m-%d %H:%M:%S')
-                
-                closed_str = inccase.date_closed
-                if closed_str:
-                    closed = datetime.datetime.strptime(closed_str, '%Y-%m-%d %H:%M:%S')
+                opened = datetime.datetime.strptime(inccase.date_opened, '%Y-%m-%dT%H:%M:%S') if inccase.date_opened else None
+                modified = datetime.datetime.strptime(inccase.date_modified, '%Y-%m-%d %H:%M:%S') if inccase.date_modified else None
+                closed = datetime.datetime.strptime(inccase.date_closed, '%Y-%m-%d %H:%M:%S') if inccase.date_closed else None
+                    
                 is_closed = inccase.closed == 'True'
+                
                 row = {'case':inccase.case, 'user':user_id_dict[inccase.user], 'owner': user_id_dict[inccase.owner],
                        'parent':inccase.parent, 'case_type':inccase.case_type, 'date_opened':opened, 'date_modified': modified,
                        'date_closed':closed, 'closed':is_closed, 'domain':self.domain}
@@ -237,8 +236,8 @@ class FormTableUpdater(StandardTableUpdater):
         insert_dicts = []
         for incform in incform_q:
             if incform.user in user_id_dict:
-                start = datetime.datetime.strptime(incform.time_start, '%Y-%m-%dT%H:%M:%S')
-                end = datetime.datetime.strptime(incform.time_end, '%Y-%m-%dT%H:%M:%S')
+                start = datetime.datetime.strptime(incform.time_start, '%Y-%m-%dT%H:%M:%S') if incform.time_start else None
+                end = datetime.datetime.strptime(incform.time_end, '%Y-%m-%dT%H:%M:%S') if incform.time_end else None
                 row = {'form':incform.form, 'xmlns':incform.xmlns, 'app':incform.app,
                        'time_start':start, 'time_end':end, 'user':user_id_dict[incform.user], 'domain':self.domain}
                 insert_dicts.append(row)
@@ -323,7 +322,7 @@ class VisitTableUpdater(StandardTableUpdater):
         v.time_end = max(visited_forms, key=lambda x : x.time_end).time_end
      
         v.save()
-        print('saved visit %d with %d cases and %d forms') % (v.visit, len(visited_cases), len(visited_forms))
+        logger.info('saved visit %d with %d cases and %d forms' % (v.visit, len(visited_cases), len(visited_forms)))
         
     def update_table(self):
         
@@ -338,7 +337,7 @@ class VisitTableUpdater(StandardTableUpdater):
         users_prefetch = prefetch(users, forms, ces)
          
         for u in users_prefetch:
-            print("GETTING VISITS FOR USER %s" % u.user)
+            logger.info("GETTING VISITS FOR USER %s" % u.user)
             prev_visited_forms = []
             prev_visited_cases = []
             

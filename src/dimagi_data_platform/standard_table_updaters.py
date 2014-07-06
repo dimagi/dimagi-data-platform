@@ -9,8 +9,8 @@ import logging
 from peewee import prefetch
 
 from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector, \
-    Visit, Interaction, FormVisit, User, Form, CaseEvent, Cases, FormDefinition, \
-    Subsector, FormDefinitionSubsector
+     User, Form, CaseEvent, Cases, FormDefinition, \
+    Subsector, FormDefinitionSubsector, Visit
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm
@@ -301,28 +301,24 @@ class VisitTableUpdater(StandardTableUpdater):
        
         super(VisitTableUpdater, self).__init__(dbconn)
         
-    def create_visit(self, user, visited_forms, visited_cases):
+    def create_visit(self, user, visited_forms):
         
-        v = Visit.create(user=user)
+        v = Visit(user=user)
+        ces = []
+        v.home_visit = False
         
-        for cs in visited_cases:
-            i = Interaction.create(case=cs, visit=v)
-            
-        v.home_visit = v.home_visit if v.home_visit else False
-        
-        v.form_duration = 0
         for fp in visited_forms:
-            v.form_duration = v.form_duration + (fp.time_end - fp.time_start).total_seconds()
-            fv = FormVisit.create(visit=v, form=fp)
-            
+            ces = ces + fp.caseevents_prefetch
             if (fp.xmlns, fp.app) in self.home_visit_forms:
                 v.home_visit = True
-        
         v.time_start = min(visited_forms, key=lambda x : x.time_start).time_start
         v.time_end = max(visited_forms, key=lambda x : x.time_end).time_end
      
         v.save()
-        logger.info('saved visit %d with %d cases and %d forms' % (v.visit, len(visited_cases), len(visited_forms)))
+        for ce in ces:
+            ce.visit = v
+            ce.save()
+        logger.info('saved visit %d with %d caseevents and %d forms' % (v.visit, len(ces), len(visited_forms)))
         
     def update_table(self):
         
@@ -367,11 +363,11 @@ class VisitTableUpdater(StandardTableUpdater):
                     # otherwise save the previous visit and create new lists of forms and cases for a new visit
                     else:
                         if prev_visited_forms:
-                            previous_visit = self.create_visit(u, prev_visited_forms, prev_visited_cases)
+                            previous_visit = self.create_visit(u, prev_visited_forms)
                             
                         prev_visited_cases = form_cases
                         prev_visited_forms = [frm]
             
             # save the last visit for this user
             if prev_visited_forms:
-                previous_visit = self.create_visit(u, prev_visited_forms, prev_visited_cases)      
+                previous_visit = self.create_visit(u, prev_visited_forms)      

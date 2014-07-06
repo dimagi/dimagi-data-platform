@@ -141,18 +141,9 @@ class Cases(BaseModel):
     class Meta:
         db_table = 'cases'
 models.append(Cases)
-        
-class CaseEvent(BaseModel):
-    id = PrimaryKeyField(db_column='id')
-    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='caseevents', on_delete='CASCADE')
-    form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, related_name='caseevents', on_delete='CASCADE')
-
-    class Meta:
-        db_table = 'case_event'
-models.append(CaseEvent)
 
 class Visit(BaseModel):
-    form_duration = IntegerField(null=True)
+
     time_end = DateTimeField(null=True)
     time_start = DateTimeField(null=True)
     home_visit = BooleanField(null=True)
@@ -162,22 +153,16 @@ class Visit(BaseModel):
     class Meta:
         db_table = 'visit'
 models.append(Visit)
-
-class Interaction(BaseModel):
-    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='interactions', on_delete='CASCADE')
-    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='interactions', on_delete='CASCADE')
-
+        
+class CaseEvent(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='caseevents', on_delete='CASCADE')
+    form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, related_name='caseevents', on_delete='CASCADE')
+    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='caseevents')
     class Meta:
-        db_table = 'case_visit'
-models.append(Interaction)
+        db_table = 'case_event'
+models.append(CaseEvent)
 
-class FormVisit(BaseModel):
-    form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, on_delete='CASCADE')
-    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='form_visits', on_delete='CASCADE')
-
-    class Meta:
-        db_table = 'form_visit'
-models.append(FormVisit)
 
 def create_missing_tables():
     database.connect()

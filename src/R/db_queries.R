@@ -65,23 +65,29 @@ get_domain_table <- function (con, domain_list) {
 
 # interaction table (one row for each visit to a case, visit to two cases = two rows)
 get_interaction_table <- function (con, domain_list) {
-query <- sprintf("with a as 
+query <- sprintf("with total_forms as 
                  (select visit_id, count (distinct form_id) as total_forms 
-                 from form_visit 
+                 from case_event 
                  group by visit_id), 
-                 b as 
+                 time_sinces as 
                  (select visit.visit_id,  date_part('epoch',time_start - lag(time_end, 1) 
                  over (partition by visit.user_id order by time_start)) as time_since_previous 
                  from visit 
-                 order by visit.user_id, time_start) 
-                 select visit.visit_id, users.user_id, cases.case_id, time_start, time_end, form_duration, 
-                 a.total_forms, b.time_since_previous, visit.home_visit, domain.name as domain
-                 from visit, users, case_visit, cases, a,b, domain
+                 order by visit.user_id, time_start),
+                 total_form_durations as (select visit.visit_id, extract('epoch' from sum(form.time_end - form.time_start)) as form_duration
+                 from form, case_event, visit 
+                 where form.id = case_event.form_id 
+                 and visit.visit_id = case_event.visit_id
+                 group by visit.visit_id)
+                 select visit.visit_id, users.user_id, cases.case_id, time_start, time_end, total_form_durations.form_duration, 
+                 total_forms.total_forms, time_sinces.time_since_previous, visit.home_visit, domain.name as domain
+                 from visit, users, case_event, cases, total_forms,time_sinces, total_form_durations, domain
                  where visit.user_id = users.id 
-                 and case_visit.case_id = cases.id 
-                 and case_visit.visit_id = visit.visit_id 
-                 and a.visit_id = visit.visit_id 
-                 and b.visit_id = visit.visit_id 
+                 and case_event.case_id = cases.id 
+                 and case_event.visit_id = visit.visit_id 
+                 and total_forms.visit_id = visit.visit_id 
+                 and time_sinces.visit_id = visit.visit_id
+                 and total_form_durations.visit_id = visit.visit_id 
                  and users.domain_id = domain.id 
                  and domain.name in (%s) 
                  order by visit.user_id, time_start", domain_list)

@@ -3,6 +3,7 @@ Created on Jun 8, 2014
 
 @author: mel
 '''
+import datetime
 import getpass
 import logging
 import os
@@ -12,6 +13,7 @@ from commcare_export.commcare_hq_client import CommCareHqClient
 from psycopg2.extras import LoggingConnection
 
 from dimagi_data_platform import data_warehouse_db, incoming_data_tables, conf
+from dimagi_data_platform.data_warehouse_db import Domain
 from dimagi_data_platform.importers import ExcelImporter, \
     CommCareExportCaseImporter, CommCareExportFormImporter
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
@@ -59,12 +61,18 @@ def update_platform_data():
             table_updater.update_table()
             
 def run_for_domains(domainlist, password):
-    for domain in domainlist:
-        api_client = CommCareHqClient('https://www.commcarehq.org', domain).authenticated(conf.CC_USER, password)
+    for dname in domainlist:
+        
+        d = Domain.get(name=dname)
+        since = d.last_hq_import
+        d.last_hq_import = datetime.datetime.now()
+        d.save()
+        
+        api_client = CommCareHqClient('https://www.commcarehq.org', dname).authenticated(conf.CC_USER, password)
         
         importers = []
-        importers.append(CommCareExportCaseImporter(api_client))
-        importers.append(CommCareExportFormImporter(api_client))
+        importers.append(CommCareExportCaseImporter(api_client, since))
+        importers.append(CommCareExportFormImporter(api_client, since))
     
         for importer in importers:
             importer.do_import()
@@ -72,16 +80,17 @@ def run_for_domains(domainlist, password):
         with LoggingConnection(conf.PSYCOPG_RAW_CON) as dbconn:
             LoggingConnection.initialize(dbconn, logger)
             table_updaters = []
-            table_updaters.append(UserTableUpdater(dbconn, domain))
-            table_updaters.append(FormTableUpdater(dbconn, domain))
-            table_updaters.append(CasesTableUpdater(dbconn, domain))
-            table_updaters.append(CaseEventTableUpdater(dbconn, domain))
+            table_updaters.append(UserTableUpdater(dbconn, dname))
+            table_updaters.append(FormTableUpdater(dbconn, dname))
+            table_updaters.append(CasesTableUpdater(dbconn, dname))
+            table_updaters.append(CaseEventTableUpdater(dbconn, dname))
             
             for table_updater in table_updaters:
                 table_updater.update_table()
         
-        vt = VisitTableUpdater(dbconn, domain)
+        vt = VisitTableUpdater(dbconn, dname)
         vt.update_table()
+        
 
 def main():
         setup()
@@ -89,7 +98,7 @@ def main():
         
         update_platform_data()
         domain_list = get_domains(conf.DOMAIN_CONF_JSON)
-        print 'domains for run are: %s' % ','.join(domain_list)
+        
         logger.info('domains for run are: %s' % ','.join(domain_list))
         
         run_for_domains(domain_list, password)

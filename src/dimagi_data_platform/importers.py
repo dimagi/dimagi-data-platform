@@ -72,11 +72,12 @@ class CommCareExportImporter(Importer):
     An importer that uses commcare-export
     '''
 
-    def __init__(self, incoming_table_class, api_client):
+    def __init__(self, incoming_table_class, api_client, since):
         '''
         Constructor
         '''
         self.api_client = api_client
+        self.since = since
         self._incoming_table_class = incoming_table_class
         
         super(CommCareExportImporter, self).__init__(self._incoming_table_class)
@@ -94,8 +95,8 @@ class CommCareExportImporter(Importer):
             raise Exception('CommCareExportImporter needs a database connection engine')
         
         writer = PgCopyWriter(self.engine.connect(), self.api_client.project)
-          
-        env = BuiltInEnv() | CommCareHqEnv(self.api_client) | JsonPathEnv({})
+        
+        env = BuiltInEnv() | CommCareHqEnv(self.api_client, self.since) | JsonPathEnv({})
         result = self._get_query.eval(env)
         
         if (self._get_table_name in [t['name'] for t in env.emitted_tables()]):
@@ -114,13 +115,11 @@ class CommCareExportFormImporter(CommCareExportImporter):
 
     _incoming_table_class = IncomingForm
     
-    def __init__(self, api_client):
+    def __init__(self, api_client, since):
         '''
         Constructor
         '''
-        self.api_client = api_client
-        
-        super(CommCareExportFormImporter, self).__init__(self._incoming_table_class,self.api_client)
+        super(CommCareExportFormImporter, self).__init__(self._incoming_table_class,api_client,since)
     
     @property
     def _get_query(self):
@@ -167,12 +166,11 @@ class CommCareExportCaseImporter(CommCareExportImporter):
 
     _incoming_table_class = IncomingCases
     
-    def __init__(self, api_client):
+    def __init__(self, api_client, since):
         '''
         Constructor
-        '''
-        self.api_client = api_client      
-        super(CommCareExportCaseImporter,self).__init__( self._incoming_table_class, self.api_client)
+        '''  
+        super(CommCareExportCaseImporter,self).__init__( self._incoming_table_class, api_client,since)
     
     @property
     def _get_query(self):

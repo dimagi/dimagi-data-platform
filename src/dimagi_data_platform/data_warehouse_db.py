@@ -55,6 +55,7 @@ class Domain(BaseModel):
     services = CharField(max_length=255, null=True)
     project_state =CharField(max_length=255, null=True)
     business_unit =CharField(max_length=255, null=True)
+    last_hq_import = DateTimeField(null=True)
     
     attributes = HStoreField(null=True)
     class Meta:
@@ -128,10 +129,10 @@ class Cases(BaseModel):
     id = PrimaryKeyField(db_column='id')
     case = CharField(db_column='case_id', max_length=255)
     case_type = CharField(max_length=255, null=True)
-    closed = CharField(max_length=255, null=True)
-    date_closed = CharField(max_length=255, null=True)
-    date_modified = CharField(max_length=255, null=True)
-    date_opened = CharField(max_length=255, null=True)
+    closed = BooleanField(null=True)
+    date_closed = DateTimeField(null=True)
+    date_modified = DateTimeField(null=True)
+    date_opened = DateTimeField(null=True)
     owner = ForeignKeyField(db_column='owner_id', null=True, rel_model=User, related_name='owned_cases', on_delete='CASCADE')
     parent = CharField(db_column='parent_id', max_length=255, null=True)
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='user_cases', on_delete='CASCADE')

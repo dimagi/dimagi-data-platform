@@ -8,6 +8,7 @@ write csv files for a set of database columns, as well as an optional hstore col
 '''
 from collections import OrderedDict
 import csv
+from datetime import datetime
 import logging
 import os
 
@@ -15,6 +16,7 @@ from commcare_export.writers import TableWriter, SqlTableWriter
 import six
 
 from dimagi_data_platform import conf
+
 
 logger = logging.getLogger(__name__)
 
@@ -49,17 +51,18 @@ class CsvPlainWriter(TableWriter):
                 
             writer.writerow(csv_headings)
             
-            row_dicts = [OrderedDict(zip(table['headings'],row)) for row in table["rows"]]
+            row_dicts = [OrderedDict(zip(table['headings'], row)) for row in table["rows"]]
+            
             for row_dict in row_dicts:
                 out = []
                 hstore_dict = {}
                 
-                for k,v in row_dict.iteritems():
+                for k, v in row_dict.iteritems():
                     if k in db_cols:
                         out.append(v.encode('utf-8') if isinstance(v, six.text_type) else v)
                     else:
                         hstore_dict[k] = v
-                hstore_str = ','.join("%s=>%s" % (key,val) for (key,val) in hstore_dict.iteritems())      
+                hstore_str = ','.join("%s=>%s" % (key, val) for (key, val) in hstore_dict.iteritems())      
                 
                 if hstore_col_name:
                     out.append(hstore_str)
@@ -92,11 +95,9 @@ class PgCopyWriter(SqlTableWriter):
         
         conn = self.base_connection
         
-        delete_sql = "DELETE FROM %s WHERE domain LIKE '%s'" % (table['name'], self.project)
-        copy_sql = "COPY %s (%s) FROM '%s' WITH CSV HEADER" % (table['name'],headings, abspath)
+        copy_sql = "COPY %s (%s) FROM '%s' WITH CSV HEADER" % (table['name'], headings, abspath)
         
         trans = conn.begin()
-        conn.execute(delete_sql)
         conn.execute(copy_sql)
         trans.commit()
         

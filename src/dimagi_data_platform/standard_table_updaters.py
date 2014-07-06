@@ -3,6 +3,7 @@ Created on Jun 17, 2014
 
 @author: mel
 '''
+import datetime
 import logging
 
 from peewee import prefetch
@@ -11,7 +12,8 @@ from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector,
     Visit, Interaction, FormVisit, User, Form, CaseEvent, Cases, FormDefinition, \
     Subsector, FormDefinitionSubsector
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
-    IncomingDomainAnnotation, IncomingFormAnnotation
+    IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
+    IncomingForm
 
 
 logger = logging.getLogger(__name__)
@@ -136,7 +138,7 @@ class FormDefTableUpdater(StandardTableUpdater):
 
 class UserTableUpdater(StandardTableUpdater):
     '''
-    updates the user table from form data
+    updates the user table from incoming forms and cases
     '''
 
     def __init__(self, dbconn, domain):
@@ -147,19 +149,25 @@ class UserTableUpdater(StandardTableUpdater):
         super(UserTableUpdater, self).__init__(dbconn)
         
     def update_table(self):
-        with self.conn.cursor() as curs:
-            curs.execute("delete from users where domain_id = '%d'" % self.domain.id)
-
-            curs.execute("insert into users(user_id,domain_id) "
-                             "(select user_id, domain.id from incoming_cases, domain where domain.name like incoming_cases.domain "
-                             " and domain.id ='%d' union select user_id, domain.id "
-                             "from incoming_cases,domain where domain.name like incoming_cases.domain and domain.id='%d' union "
-                             "select owner_id, domain.id from incoming_cases, domain "
-                             "where domain.name like incoming_cases.domain and domain.id='%d');" % (self.domain.id, self.domain.id, self.domain.id))
+        case_users = IncomingCases.select(IncomingCases.user).where(IncomingCases.domain == self.domain.name)
+        case_owners = IncomingCases.select(IncomingCases.owner).where(IncomingCases.domain == self.domain.name)
+        form_users = IncomingForm.select(IncomingForm.user).where(IncomingForm.domain == self.domain.name)
+        incoming_user_ids = set([u.user for u in case_users]) & set([o.owner for o in case_owners]) & set([f.user for f in form_users])
+        
+        for user_id in incoming_user_ids:
+            try:
+                existing_q = User.select().join(Domain).where((User.user == user_id) & (Domain.id == self.domain.id))
+                existing = existing_q.get()
+                logger.debug('found existsing user for domain %s with userid %s' % (self.domain.name, user_id))
+            except User.DoesNotExist:
+                logger.debug('ADDING new user for domain %s with userid %s' % (self.domain.name, user_id))
+                new_user = User.create(user=user_id, domain=self.domain)
 
 class CasesTableUpdater(StandardTableUpdater):
     '''
-    updates the user table from form data
+    updates the case table from incoming cases
+    
+    TODO currently deletes and recreates all rows for a domain. should modify and add only new rows instead
     '''
 
     def __init__(self, dbconn, domain):
@@ -170,21 +178,44 @@ class CasesTableUpdater(StandardTableUpdater):
         super(CasesTableUpdater, self).__init__(dbconn)
         
     def update_table(self):
-        with self.conn.cursor() as curs:
-            curs.execute("delete from cases where domain_id = '%d'" % self.domain.id)
-            curs.execute("insert into cases (case_id, user_id, owner_id, parent_id, case_type, date_opened, date_modified, closed, date_closed, domain_id) "
-                             "(select distinct on (case_id) case_id, a.id as user_id, b.id as owner_id, parent_id, case_type, date_opened, date_modified, closed, date_closed, domain.id "
-                             "from incoming_cases, users as a, users as b, domain "
-                             "where a.user_id = incoming_cases.user_id and b.user_id = incoming_cases.owner_id and a.domain_id = domain.id and b.domain_id = domain.id "
-                             "and domain.name = incoming_cases.domain "
-                             "and domain.id = '%d' "
-                             "order by case_id, date_modified desc);" % (self.domain.id))
+        inccases_q = IncomingCases.select().where(IncomingCases.domain == self.domain.name)
+        
+        user_id_q = self.domain.users.select()
+        user_id_dict = dict([(u.user, u) for u in user_id_q])
+        
+        delete_q = Cases.delete().where(Cases.domain == self.domain)
+        delete_q.execute()
+        
+        insert_dicts = []
+        for inccase in inccases_q:
+            if inccase.user in user_id_dict and inccase.owner in user_id_dict:
+                
+                # note different date formats for these
+                opened = datetime.datetime.strptime(inccase.date_opened, '%Y-%m-%dT%H:%M:%S')
+                modified = datetime.datetime.strptime(inccase.date_modified, '%Y-%m-%d %H:%M:%S')
+                
+                closed_str = inccase.date_closed
+                if closed_str:
+                    closed = datetime.datetime.strptime(closed_str, '%Y-%m-%d %H:%M:%S')
+                is_closed = inccase.closed == 'True'
+                row = {'case':inccase.case, 'user':user_id_dict[inccase.user], 'owner': user_id_dict[inccase.owner],
+                       'parent':inccase.parent, 'case_type':inccase.case_type, 'date_opened':opened, 'date_modified': modified,
+                       'date_closed':closed, 'closed':is_closed, 'domain':self.domain}
+                insert_dicts.append(row)
+            else:
+                logger.warn("while inserting case with ID %s for domain %s couldn't find either the user or owner. user ID is %s, owner ID is %s" % (inccase.case, inccase.domain, inccase.user, inccase.owner))
+        
+        if insert_dicts:
+            deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
+            Cases.insert_many(deduped).execute()
         
         
 
 class FormTableUpdater(StandardTableUpdater):
     '''
-    updates the user table from form data
+    updates the form table from incoming forms
+    
+    TODO currently deletes and recreates all rows for a domain. should modify and add only new rows instead
     '''
 
     def __init__(self, dbconn, domain):
@@ -195,20 +226,36 @@ class FormTableUpdater(StandardTableUpdater):
         super(FormTableUpdater, self).__init__(dbconn)
         
     def update_table(self):
-        with self.conn.cursor() as curs:
-            curs.execute("delete from form where domain_id = '%d'" % self.domain.id)
+        incform_q = IncomingForm.select().where(IncomingForm.domain == self.domain.name)
+        
+        user_id_q = self.domain.users.select()
+        user_id_dict = dict([(u.user, u) for u in user_id_q])
+        
+        delete_q = Form.delete().where(Form.domain == self.domain)
+        delete_q.execute()
+        
+        insert_dicts = []
+        for incform in incform_q:
+            if incform.user in user_id_dict:
+                start = datetime.datetime.strptime(incform.time_start, '%Y-%m-%dT%H:%M:%S')
+                end = datetime.datetime.strptime(incform.time_end, '%Y-%m-%dT%H:%M:%S')
+                row = {'form':incform.form, 'xmlns':incform.xmlns, 'app':incform.app,
+                       'time_start':start, 'time_end':end, 'user':user_id_dict[incform.user], 'domain':self.domain}
+                insert_dicts.append(row)
+            else:
+                logger.warn("while inserting form with ID %s for domain %s couldn't find user. user ID is %s" % (incform.form, incform.domain, incform.user))
+        
+        
+        if insert_dicts:
+            deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
+            Form.insert_many(deduped).execute()
 
-            curs.execute("insert into form (form_id, xmlns, app_id, time_start, time_end, user_id, domain_id) "
-                "(select distinct on (form_id) form_id, xmlns, app_id, to_timestamp(replace(time_start,'T',' '),'YYYY-MM-DD HH24:MI:SS') "
-                "as time_start, to_timestamp(replace(time_end,'T',' '),'YYYY-MM-DD HH24:MI:SS') as time_end, users.id as user_id, domain.id "
-                "from incoming_form, users, domain "
-                "where incoming_form.domain like domain.name "
-                "and domain.id='%d' and users.user_id = incoming_form.user_id  and users.domain_id = domain.id and domain.name = incoming_form.domain "
-                "order by form_id, time_start);" % self.domain.id)
 
 class CaseEventTableUpdater(StandardTableUpdater):
     '''
-    updates the user table from form data
+    updates the case event table from incoming forms
+    
+    TODO currently deletes and recreates all rows for a domain. should modify and add only new rows instead
     '''
 
     def __init__(self, dbconn, domain):
@@ -219,18 +266,31 @@ class CaseEventTableUpdater(StandardTableUpdater):
         super(CaseEventTableUpdater, self).__init__(dbconn)
         
     def update_table(self):
-        with self.conn.cursor() as curs:
-            curs.execute("delete from case_event where form_id in (select id from form where domain_id = '%d');" % self.domain.id)
-            curs.execute("insert into case_event(form_id, case_id) (select form.id, cases.id from incoming_form, form, cases, domain "
-                         "where incoming_form.form_id = form.form_id and incoming_form.case_id = cases.case_id "
-                         " and domain.id = form.domain_id "
-                         " and domain.id = cases.domain_id "
-                         " and domain.id = '%d');" % self.domain.id)
         
+        ce_q = IncomingForm.select(IncomingForm.form, IncomingForm.case).where(IncomingForm.domain == self.domain.name)
+        
+        form_id_q = self.domain.forms.select(Form.id, Form.form)
+        form_id_dict = dict([(f.form, f) for f in form_id_q])
+        
+        case_id_q = self.domain.cases.select(Cases.id, Cases.case)
+        case_id_dict = dict([(c.case, c) for c in case_id_q])
+        
+        delete_q = CaseEvent.delete().where(CaseEvent.form << form_id_dict.values())
+        delete_q.execute()
+        
+        insert_dicts = []
+        for ce_attrs in ce_q:
+            if ce_attrs.form in form_id_dict and ce_attrs.case in case_id_dict:
+                insert_dicts.append({'form':form_id_dict[ce_attrs.form], 'case':case_id_dict[ce_attrs.case]})
+        
+        if insert_dicts:
+            CaseEvent.insert_many(insert_dicts).execute()
 
 class VisitTableUpdater(StandardTableUpdater):
     '''
     updates the user table from form data
+    
+    TODO currently deletes and recreates all rows for a domain. should modify and add only new rows instead
     '''
 
     def __init__(self, dbconn, domain):

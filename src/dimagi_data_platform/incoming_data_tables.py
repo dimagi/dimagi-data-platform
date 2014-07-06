@@ -5,12 +5,14 @@ Created on Jun 23, 2014
 '''
 
 
+from datetime import datetime
 import logging
 
 from peewee import Model, CharField, drop_model_tables, PrimaryKeyField
 from playhouse.postgres_ext import *
 
 from dimagi_data_platform import conf
+
 
 logger = logging.getLogger('peewee')
 logging.basicConfig(level=conf.log_level,
@@ -24,13 +26,14 @@ class UnknownField(object):
     pass
 
 class BaseModel(Model):
+    id = PrimaryKeyField(db_column='id')
     class Meta:
         database = database
         
 models = []
 
 class IncomingDomain(BaseModel):
-    id = PrimaryKeyField(db_column='id')
+    
     attributes = HStoreField()
 
     class Meta:
@@ -38,7 +41,6 @@ class IncomingDomain(BaseModel):
 models.append(IncomingDomain)
         
 class IncomingDomainAnnotation(BaseModel):
-    id = PrimaryKeyField(db_column='id')
     attributes = HStoreField()
 
     class Meta:
@@ -46,7 +48,6 @@ class IncomingDomainAnnotation(BaseModel):
 models.append(IncomingDomainAnnotation)
         
 class IncomingFormAnnotation(BaseModel):
-    id = PrimaryKeyField(db_column='id')
     attributes = HStoreField()
 
     class Meta:
@@ -54,7 +55,6 @@ class IncomingFormAnnotation(BaseModel):
 models.append(IncomingFormAnnotation)
 
 class IncomingCases(BaseModel):
-    id = PrimaryKeyField(db_column='id')
     api = CharField(db_column='ihK88ODLqyKDapi_id', max_length=255, null=True)
     case = CharField(db_column='case_id', max_length=255, null=True)
     case_type = CharField(max_length=255, null=True)
@@ -72,7 +72,6 @@ class IncomingCases(BaseModel):
 models.append(IncomingCases)
 
 class IncomingForm(BaseModel):
-    id = PrimaryKeyField(db_column='id')
     app = CharField(db_column='app_id', max_length=255, null=True)
     app_version = CharField(max_length=255, null=True)
     case = CharField(db_column='case_id', max_length=255, null=True)
@@ -103,7 +102,7 @@ def create_missing_tables():
         
 def drop_and_create():
     database.connect()
-    drop_model_tables(models,fail_silently=True)
+    drop_model_tables(models, fail_silently=True)
     
     for m in models:
         m.create_table()

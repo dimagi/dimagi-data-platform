@@ -95,9 +95,11 @@ class PgCopyWriter(SqlTableWriter):
         
         conn = self.base_connection
         
+        delete_sql = "DELETE FROM %s WHERE domain LIKE '%s'" % (table['name'], self.project)
         copy_sql = "COPY %s (%s) FROM '%s' WITH CSV HEADER" % (table['name'], headings, abspath)
         
         trans = conn.begin()
+        conn.execute(delete_sql)
         conn.execute(copy_sql)
         trans.commit()
         

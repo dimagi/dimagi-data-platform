@@ -65,6 +65,8 @@ def run_for_domains(domainlist, password):
         d.last_hq_import = datetime.datetime.now()
         d.save()
         
+        logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
+        
         api_client = CommCareHqClient('https://www.commcarehq.org', dname).authenticated(conf.CC_USER, password)
         
         importers = []
@@ -81,27 +83,32 @@ def run_for_domains(domainlist, password):
         table_updaters.append(CaseEventTableUpdater(dname))
         table_updaters.append(VisitTableUpdater(dname))
         
+        logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
         for table_updater in table_updaters:
             table_updater.update_table()
         
 
 def main():
+        logger.info('TIMESTAMP starting run %s' % datetime.datetime.now())
         setup()
         password = getpass.getpass()
         
+        logger.info('TIMESTAMP updating platform data - domains, forms definitions %s' % datetime.datetime.now())
         update_platform_data()
         domain_list = get_domains(conf.DOMAIN_CONF_JSON)
         
+        logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
-        
         run_for_domains(domain_list, password)
         
         r_script_path = os.path.abspath('R/')
         conf_path = os.path.abspath('.')
         
+        logger.info('TIMESTAMP starting report run %s' % datetime.datetime.now())
         for report in conf.REPORTS:
             run_proccess_and_log('Rscript', [os.path.join(r_script_path, '%s.R' % report), r_script_path, conf_path, ','.join(["'%s'" % n for n in domain_list])])
         
+        logger.info('TIMESTAMP aws sync %s' % datetime.datetime.now())
         run_proccess_and_log('aws', ['s3', 'sync', conf.OUTPUT_DIR, conf.AWS_S3_OUTPUT_URL])
     
 if __name__ == '__main__':

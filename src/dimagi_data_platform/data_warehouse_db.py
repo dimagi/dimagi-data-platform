@@ -130,7 +130,7 @@ class Form(BaseModel):
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms', on_delete='CASCADE')
     xmlns = CharField(max_length=255, null=True)
     
-    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='forms')
+    visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='forms', on_delete='SET NULL')
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='forms')
 
     class Meta:

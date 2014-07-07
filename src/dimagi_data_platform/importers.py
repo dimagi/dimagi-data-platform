@@ -137,6 +137,7 @@ class CommCareExportFormImporter(CommCareExportImporter):
                               Literal('time_end'),
                               Literal('received_on'),
                               Literal('case_id'),
+                              Literal('alt_case_id'),
                               Literal('created'),
                               Literal('updated'),
                               Literal('closed')],
@@ -154,6 +155,7 @@ class CommCareExportFormImporter(CommCareExportImporter):
                               Reference('$.metadata.timeEnd'),
                               Reference('$.received_on'),
                               Reference('@case_id'),
+                              Reference('case_id'),
                               Apply(Reference('bool'), Reference('create')),
                               Apply(Reference('bool'), Reference('update')),
                               Apply(Reference('bool'), Reference('close')), ])))

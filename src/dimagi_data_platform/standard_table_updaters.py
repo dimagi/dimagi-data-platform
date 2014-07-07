@@ -305,7 +305,7 @@ class CaseEventTableUpdater(StandardTableUpdater):
         
     def update_table(self):
         logger.info('TIMESTAMP starting case event table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
-        ce_q = IncomingForm.select(IncomingForm.form, IncomingForm.case).where(IncomingForm.domain == self.domain.name)
+        ce_q = IncomingForm.select(IncomingForm.form, IncomingForm.case, IncomingForm.alt_case).where(IncomingForm.domain == self.domain.name)
         
         form_id_q = self.domain.forms.select(Form.id, Form.form)
         form_id_dict = dict([(f.form, f) for f in form_id_q])
@@ -317,8 +317,9 @@ class CaseEventTableUpdater(StandardTableUpdater):
         
         insert_dicts = []
         for ce_attrs in ce_q:
-            if ce_attrs.form in form_id_dict and ce_attrs.case in case_id_dict:
-                row = {'form':form_id_dict[ce_attrs.form], 'case':case_id_dict[ce_attrs.case]}
+            case_id = ce_attrs.case if ce_attrs.case else ce_attrs.alt_case
+            if ce_attrs.form in form_id_dict and case_id in case_id_dict:
+                row = {'form':form_id_dict[ce_attrs.form], 'case':case_id_dict[case_id]}
                 
                 if (ce_attrs.form,ce_attrs.case) not in existing_formcase_pairs:
                     insert_dicts.append(row)

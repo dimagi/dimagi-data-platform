@@ -70,6 +70,7 @@ class IncomingForm(BaseModel):
     app = CharField(db_column='app_id', max_length=255, null=True)
     app_version = CharField(max_length=255, null=True)
     case = CharField(db_column='case_id', max_length=255, null=True)
+    alt_case = CharField(db_column='alt_case_id', max_length=255, null=True)
     closed = CharField(max_length=255, null=True)
     created = CharField(max_length=255, null=True)
     device = CharField(db_column='device_id', max_length=255, null=True)

@@ -11,7 +11,7 @@ import subprocess
 
 from commcare_export.commcare_hq_client import CommCareHqClient
 
-from dimagi_data_platform import data_warehouse_db, incoming_data_tables, conf
+from dimagi_data_platform import incoming_data_tables, data_warehouse_db, conf
 from dimagi_data_platform.data_warehouse_db import Domain
 from dimagi_data_platform.importers import ExcelImporter, \
     CommCareExportCaseImporter, CommCareExportFormImporter
@@ -20,7 +20,8 @@ from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
 from dimagi_data_platform.standard_table_updaters import DomainTableUpdater, \
     UserTableUpdater, FormTableUpdater, CasesTableUpdater, CaseEventTableUpdater, \
     VisitTableUpdater, FormDefTableUpdater
-from dimagi_data_platform.utils import get_domains
+from dimagi_data_platform.utils import get_domains, configure_logger, \
+    configure_secondary_logger
 
 
 logger = logging.getLogger('dimagi_data_platform')
@@ -35,6 +36,9 @@ def run_proccess_and_log(cmd, args_list):
         logger.error(stderr)
         
 def setup():
+    configure_logger(logger)
+    peewee_logger = logging.getLogger('peewee')
+    configure_secondary_logger(peewee_logger)
     incoming_data_tables.create_missing_tables()
     data_warehouse_db.create_missing_tables()
     

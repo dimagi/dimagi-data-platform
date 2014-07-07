@@ -9,13 +9,7 @@ import logging
 
 from playhouse.postgres_ext import PostgresqlExtDatabase
 
-log_level = logging.DEBUG
 logger = logging.getLogger('dimagi_data_platform')
-logging.basicConfig(level=log_level,
-                    format='%(asctime)s %(levelname)s %(message)s',
-                    filename='/var/tmp/data_platform_run.log',
-                    filemode='w')
-
 
 with open('config.json', 'r') as f:
     global _json_conf

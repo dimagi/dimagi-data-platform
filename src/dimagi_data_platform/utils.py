@@ -81,3 +81,12 @@ def get_domains(domain_conf_json):
             domains.extend(set(filter_lists[0]).intersection(*filter_lists))
     
     return list(set(domains))
+
+def break_into_chunks(l, n):
+    '''
+    take a list and return a list of lists of length n
+    used for bulk inserts
+    '''
+    if n < 1:
+        n = 1
+    return [l[i:i + n] for i in range(0, len(l), n)]

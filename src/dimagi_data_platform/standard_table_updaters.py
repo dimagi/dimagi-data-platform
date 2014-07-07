@@ -14,14 +14,17 @@ from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector,
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm
+from dimagi_data_platform.utils import break_into_chunks
 
 
 logger = logging.getLogger(__name__)
+
 
 class StandardTableUpdater(object):
     '''
     updates a standard table from one or more incoming data tables produced by the importers
     '''
+    _db_warehouse_table_class = None
     
     def __init__(self):
         super(StandardTableUpdater, self).__init__()
@@ -29,12 +32,24 @@ class StandardTableUpdater(object):
     def update_table(self):
         pass
     
+    def insert_chunked(self, l):
+        
+        if not self._db_warehouse_table_class:
+            logger.error('No data warehouse table class is defined, cannot insert chunked list')
+        else:
+            chunks = break_into_chunks(l, 5000)
+            count = 0
+            for chunk in chunks:
+                count = count + 1
+                logger.info('inserting chunk %d of %d' % (count, len(chunks)))
+                self._db_warehouse_table_class.insert_many(chunk).execute()
+    
 
 class DomainTableUpdater(StandardTableUpdater):
     '''
     updates the domain table, plus sectors and subsectors
     '''
-    
+    _db_warehouse_table_class = Domain
     _first_col_names_to_skip = ['Total', 'Mean', 'STD']
     
     def __init__(self):
@@ -95,6 +110,7 @@ class FormDefTableUpdater(StandardTableUpdater):
     '''
     updates the form definition table, plus subsectors
     '''
+    _db_warehouse_table_class = FormDefinition
     
     def __init__(self):
         super(FormDefTableUpdater, self).__init__()
@@ -140,6 +156,9 @@ class UserTableUpdater(StandardTableUpdater):
     '''
     updates the user table from incoming forms and cases
     '''
+    
+    _db_warehouse_table_class = User
+    
 
     def __init__(self, domain):
         '''
@@ -166,6 +185,8 @@ class CasesTableUpdater(StandardTableUpdater):
     '''
     updates the case table from incoming cases
     '''
+    
+    _db_warehouse_table_class = Cases
 
     def __init__(self, domain):
         '''
@@ -209,7 +230,7 @@ class CasesTableUpdater(StandardTableUpdater):
         
         if insert_dicts:
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
-            Cases.insert_many(deduped).execute()
+            self.insert_chunked(deduped)
             
         for row in update_dicts:
             q = Cases.update(**row).where(Cases.case == row['case'])
@@ -220,8 +241,9 @@ class CasesTableUpdater(StandardTableUpdater):
 class FormTableUpdater(StandardTableUpdater):
     '''
     updates the form table from incoming forms
-    
     '''
+    
+    _db_warehouse_table_class = Form
 
     def __init__(self, domain):
         '''
@@ -259,10 +281,10 @@ class FormTableUpdater(StandardTableUpdater):
         
         if insert_dicts:
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
-            Form.insert_many(deduped).execute()
+            self.insert_chunked(deduped)
         
         for row in update_dicts:
-            logger.info('updating form with dict %s' % row)
+            logger.debug('updating form with dict %s' % row)
             q = Form.update(**row).where(Form.form == row['form'])
             q.execute()
 
@@ -270,8 +292,9 @@ class FormTableUpdater(StandardTableUpdater):
 class CaseEventTableUpdater(StandardTableUpdater):
     '''
     updates the case event table from incoming forms
-    
     '''
+    
+    _db_warehouse_table_class = CaseEvent
 
     def __init__(self, domain):
         '''
@@ -301,14 +324,14 @@ class CaseEventTableUpdater(StandardTableUpdater):
                     insert_dicts.append(row)
         
         if insert_dicts:
-            CaseEvent.insert_many(insert_dicts).execute()
+            self.insert_chunked(insert_dicts)
 
 class VisitTableUpdater(StandardTableUpdater):
     '''
     updates the user table from form data
-    
-    TODO currently deletes and recreates all rows for a domain. should modify and add only new rows instead
     '''
+    
+    _db_warehouse_table_class = Visit
 
     def __init__(self, domain):
         '''
@@ -343,7 +366,7 @@ class VisitTableUpdater(StandardTableUpdater):
         v.time_end = max(visited_forms, key=lambda x : x.time_end).time_end
      
         v.save()
-        logger.info('saved visit with id %d for user %s, %d forms' % (v.id,user.id,len(visited_forms)))
+        logger.debug('saved visit with id %d for user %s, %d forms' % (v.id,user.id,len(visited_forms)))
         
     def update_table(self):
         logger.info('TIMESTAMP starting visit table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
@@ -358,7 +381,7 @@ class VisitTableUpdater(StandardTableUpdater):
         users_prefetch = prefetch(users, forms, ces)
          
         for u in users_prefetch:
-            logger.info("GETTING VISITS FOR USER %s" % u.user)
+            logger.info("getting visits for user %s" % u.user)
             
             # forms already in visit
             prev_visited_forms = []

@@ -13,6 +13,8 @@ from playhouse.postgres_ext import *
 
 from dimagi_data_platform import conf
 
+logger = logging.getLogger('peewee')
+
 database = conf.PEEWEE_DB_CON
 
 class UnknownField(object):

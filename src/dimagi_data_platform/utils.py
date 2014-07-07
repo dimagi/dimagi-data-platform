@@ -11,34 +11,19 @@ from dimagi_data_platform.data_warehouse_db import Domain
 logger = logging.getLogger(__name__)
 
 def configure_logger(lg):
-    lg.setLevel(logging.DEBUG)
-    logger_file_handler = logging.FileHandler('/var/tmp/data_platform_run.log',mode='w')
-    logger_file_handler.setLevel(logging.DEBUG)
-
+    logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                    datefmt='%m-%d %H:%M',
+                    filename='/var/tmp/data_platform_run.log',
+                    filemode='w')
+    
     logger_consol_handler = logging.StreamHandler()
     logger_consol_handler.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
-    logger_file_handler.setFormatter(formatter)
     logger_consol_handler.setFormatter(formatter)
 
-    lg.addHandler(logger_file_handler)
-    lg.addHandler(logger_consol_handler)
-    
-def configure_secondary_logger(lg):
-    lg.setLevel(logging.DEBUG)
-    logger_file_handler = logging.FileHandler('/var/tmp/data_platform_run.log',mode='a')
-    logger_file_handler.setLevel(logging.DEBUG)
-
-    logger_consol_handler = logging.StreamHandler()
-    logger_consol_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    
-    logger_file_handler.setFormatter(formatter)
-    logger_consol_handler.setFormatter(formatter)
-
-    lg.addHandler(logger_file_handler)
-    lg.addHandler(logger_consol_handler)
+    logging.getLogger('').addHandler(logger_consol_handler)
 
 def get_domains(domain_conf_json):
     '''

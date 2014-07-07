@@ -99,7 +99,7 @@ class PgCopyWriter(SqlTableWriter):
         copy_sql = "COPY %s (%s) FROM '%s' WITH CSV HEADER" % (table['name'], headings, abspath)
         
         trans = conn.begin()
-        # conn.execute(delete_sql)
+        conn.execute(delete_sql)
         conn.execute(copy_sql)
         trans.commit()
         

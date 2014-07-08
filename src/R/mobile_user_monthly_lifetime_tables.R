@@ -5,29 +5,9 @@ library(plyr)
 library(timeDate)
 library(reshape2)
 
-# should the script use a csv file for testing instead of a database query?
-use_csv <- FALSE
-csv_filename <- "/home/mel/Documents/2013-2014/dimagi/data_platform_R/first run sample data for mengji/interaction_table_sample2.csv"
-
-# get command line args (passed to Rscript)
-args <- commandArgs(trailingOnly = TRUE)
-if (length(args)==0){
-  print('warning, no command line args')
-  args<-vector()
-  args[1]<-'/home/mel/workspace/dimagi-data-platform/src/R'
-  args[2]<-'/home/mel/workspace/dimagi-data-platform/src'
-  args[3]<-"'melissa-test-project','crs-imci'"# domains, comma-separated and surrounded by single quotes
-}
-r_script_path <- args[1] # where to find the other scripts we're sourcing
-config_path <- args[2] # where to find config.json
-domain_list <- args[3]
-
-# get the config parameters
-source (file.path(r_script_path,"data_platform_funcs.R", fsep = .Platform$file.sep))
-conf <- get_config(config_path)
-
 if (use_csv == TRUE) {
   # get data from a csv file
+  csv_filename <- "/home/mel/Documents/2013-2014/dimagi/data_platform_R/first run sample data for mengji/interaction_table_sample2.csv"
   source(file.path(r_script_path,"csv_sources.R", fsep = .Platform$file.sep),chdir=T)
   v<-get_interaction_table_from_csv(csv_filename)
 } else {

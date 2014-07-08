@@ -78,10 +78,18 @@ query <- sprintf("with total_forms as
                  (select visit.id, extract('epoch' from sum(form.time_end - form.time_start)) as form_duration
                  from form, visit 
                  where form.visit_id = visit.id
-                 group by visit.id)
+                 group by visit.id),
+                 home_visits as
+                 (select visit_id, bool_or(CASE WHEN (attributes->'Travel visit' = 'No') THEN FALSE ELSE TRUE END) as home_visit
+                 from visit
+                 inner join form on (form.visit_id = visit.id)
+                 left join formdef
+                 on (formdef.xmlns = form.xmlns
+                 and formdef.app_id = form.app_id)
+                 group by form.visit_id)
                  select visit.id, users.user_id, cases.case_id, visit.time_start, visit.time_end, total_form_durations.form_duration, 
-                 total_forms.total_forms, time_sinces.time_since_previous, visit.home_visit, domain.name as domain
-                 from visit, users, form, case_event, cases, total_forms,time_sinces, total_form_durations, domain
+                 total_forms.total_forms, time_sinces.time_since_previous, home_visits.home_visit, domain.name as domain
+                 from visit, users, form, case_event, cases, total_forms,time_sinces, total_form_durations, home_visits,domain
                  where visit.user_id = users.id 
                  and case_event.case_id = cases.id 
                  and case_event.form_id = form.id
@@ -89,6 +97,7 @@ query <- sprintf("with total_forms as
                  and total_forms.id = visit.id 
                  and time_sinces.id = visit.id
                  and total_form_durations.id = visit.id 
+                 and home_visits.visit_id = visit.id
                  and users.domain_id = domain.id 
                  and domain.name in (%s) 
                  order by visit.user_id, time_start", domain_list)

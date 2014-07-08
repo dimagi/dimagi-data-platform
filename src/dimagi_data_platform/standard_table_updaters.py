@@ -338,9 +338,7 @@ class VisitTableUpdater(StandardTableUpdater):
         '''
         Constructor
         '''
-        self.domain = Domain.get(name=domain)   
-        self.home_visit_forms = [(fdef.xmlns, fdef.app_id) for fdef in self.domain.formdefs if fdef.attributes['Travel visit'] == 'Yes']
-       
+        self.domain = Domain.get(name=domain)
         super(VisitTableUpdater, self).__init__()
         
     def delete_most_recent(self, user):
@@ -355,18 +353,13 @@ class VisitTableUpdater(StandardTableUpdater):
         
     def create_visit(self, user, visited_forms):
         
-        v = Visit.create(user=user)
-        v.home_visit = False
+        time_start = min(visited_forms, key=lambda x : x.time_start).time_start
+        time_end = max(visited_forms, key=lambda x : x.time_end).time_end
+        v = Visit.create(user=user, time_start = time_start, time_end = time_end)
         
         for fp in visited_forms:
             fp.visit = v
-            if (fp.xmlns, fp.app) in self.home_visit_forms:
-                v.home_visit = True
             fp.save()
-        v.time_start = min(visited_forms, key=lambda x : x.time_start).time_start
-        v.time_end = max(visited_forms, key=lambda x : x.time_end).time_end
-     
-        v.save()
         logger.debug('saved visit with id %d for user %s, %d forms' % (v.id,user.id,len(visited_forms)))
         
     def update_table(self):

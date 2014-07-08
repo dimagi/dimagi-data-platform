@@ -111,7 +111,7 @@ class Visit(BaseModel):
     id = PrimaryKeyField(db_column='id')
     time_end = DateTimeField(null=True)
     time_start = DateTimeField(null=True)
-    home_visit = BooleanField(null=True)
+
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='visits', on_delete='CASCADE')
     class Meta:
         db_table = 'visit'

@@ -12,5 +12,8 @@ domain_list <- args[4] # list of domains to run for
 source (file.path(r_script_path,"data_platform_funcs.R", fsep = .Platform$file.sep))
 conf <- get_config(config_path)
 
+# should the script use a csv file for testing instead of a database query?
+use_csv <- FALSE
+
 # run the report
 source (file.path(r_script_path,report_module_script, fsep = .Platform$file.sep))

@@ -3,9 +3,9 @@
 # don't commit this file unless you change more than just the variables.
 
 # set local values for command line args
-report_module_script <- "mobile_user_monthly_lifetime_tables.R"
-r_script_path <-'/home/mel/workspace/dimagi-data-platform/src/R'
-config_path <-'/home/mel/workspace/dimagi-data-platform/src'
+report_module_script <- "mobile_user_monthly_lifetime_tables.R" # report to run
+r_script_path <-'/home/mel/workspace/dimagi-data-platform/src/R' # absolute path to R scripts
+config_path <-'/home/mel/workspace/dimagi-data-platform/src' # absolute path to config.json
 domain_list <-"'melissa-test-project','crs-imci'"# domains, comma-separated and surrounded by single quotes
 
 # get the config parameters

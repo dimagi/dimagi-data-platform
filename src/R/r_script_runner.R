@@ -1,3 +1,5 @@
+# called to run an R report module through Rscript, with command line arguments.
+
 # get command line args (passed to Rscript)
 args <- commandArgs(trailingOnly = TRUE)
 

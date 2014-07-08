@@ -1,3 +1,7 @@
+# can be used to set local test values for the variables that will be passed as command line arguments
+# when run through the data platform.
+# don't commit this file unless you change more than just the variables.
+
 # set local values for command line args
 report_module_script <- "mobile_user_monthly_lifetime_tables.R"
 r_script_path <-'/home/mel/workspace/dimagi-data-platform/src/R'

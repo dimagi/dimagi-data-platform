@@ -1,3 +1,6 @@
+# report module - should be run from either r_script_runner.R or test_runner to R
+# without these, the required config variables and file paths will not be set!
+
 # install/import libraries 
 library(zoo)
 library(digest)

@@ -307,13 +307,14 @@ class CaseEventTableUpdater(StandardTableUpdater):
         logger.info('TIMESTAMP starting case event table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         ce_q = IncomingForm.select(IncomingForm.form, IncomingForm.case, IncomingForm.alt_case).where(IncomingForm.domain == self.domain.name).execute()
         
-        form_id_q = self.domain.forms.select(Form.id, Form.form)
-        form_id_dict = dict([(f.form, f) for f in form_id_q])
+        form_id_q = self.domain.forms.select(Form.id, Form.form).execute()
+        form_id_dict = dict([(f.form, f) for f in form_id_q.iterator()])
         
-        case_id_q = self.domain.cases.select(Cases.id, Cases.case)
-        case_id_dict = dict([(c.case, c) for c in case_id_q])
+        case_id_q = self.domain.cases.select(Cases.id, Cases.case).execute()
+        case_id_dict = dict([(c.case, c) for c in case_id_q.iterator()])
         
-        existing_formcase_pairs = [(ce.form.form,ce.case.case) for ce in CaseEvent.select().join(Form).where(Form.domain == self.domain).join(Cases, on=(CaseEvent.case==Cases.id))]
+        existing_formcase_q = CaseEvent.select().join(Form).where(Form.domain == self.domain).join(Cases, on=(CaseEvent.case==Cases.id))
+        existing_formcase_pairs = [(ce.form.form,ce.case.case) for ce in existing_formcase_q.iterator()]
         
         insert_dicts = []
         for ce_attrs in ce_q.iterator():

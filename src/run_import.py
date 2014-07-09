@@ -74,6 +74,9 @@ def run_for_domains(domainlist, password):
     
         for importer in importers:
             importer.do_import()
+        
+        d.last_hq_import = datetime.datetime.now()
+        d.save()
 
         table_updaters = []
         table_updaters.append(UserTableUpdater(dname))
@@ -86,8 +89,9 @@ def run_for_domains(domainlist, password):
         for table_updater in table_updaters:
             table_updater.update_table()
             
-        d.last_hq_import = datetime.datetime.now()
-        d.save()
+        for importer in importers:
+            importer.do_cleanup()
+
         
 
 def main():

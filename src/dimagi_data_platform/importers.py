@@ -66,6 +66,9 @@ class Importer(object):
         
     def do_import(self):
         pass
+    
+    def do_cleanup(self):
+        pass
 
 class CommCareExportImporter(Importer):
     '''
@@ -107,6 +110,10 @@ class CommCareExportImporter(Importer):
               
         else:
             logger.warn('no table emitted with name %s' % self._get_table_name)
+            
+    def do_cleanup(self):
+        delete_q = self._incoming_table_class.delete().where(self._incoming_table_class.domain == self.api_client.project)
+        delete_q.execute()
             
 class CommCareExportFormImporter(CommCareExportImporter):
     '''
@@ -236,9 +243,6 @@ class ExcelImporter(Importer):
     
     def do_import(self):
         
-        dq = self._incoming_table_class.delete()
-        dq.execute()
-        
         db_col_keys = [k for k in self._get_workbook_keys() if k in self._get_db_cols]
         hstore_keys = [h for h in self._get_workbook_keys() if h not in self._get_db_cols]
         
@@ -250,6 +254,10 @@ class ExcelImporter(Importer):
             insert_dict[self._get_hstore_db_col] = hstore_col_dict
 
             self._incoming_table_class.create(**insert_dict)
+            
+    def do_cleanup(self):
+        dq = self._incoming_table_class.delete()
+        dq.execute()
 
 
     

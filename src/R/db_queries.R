@@ -80,7 +80,8 @@ query <- sprintf("with total_forms as
                  where form.visit_id = visit.id
                  group by visit.id),
                  home_visits as
-                 (select visit_id, bool_or(CASE WHEN (attributes->'Travel visit' = 'No') THEN FALSE ELSE TRUE END) as home_visit
+                 (select visit_id, bool_or(CASE WHEN (attributes->'Travel visit' = 'No') THEN FALSE 
+                 WHEN (attributes->'Travel visit' = 'Yes') THEN TRUE ELSE null END) as home_visit
                  from visit
                  inner join form on (form.visit_id = visit.id)
                  left join formdef

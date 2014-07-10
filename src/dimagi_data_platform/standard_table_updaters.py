@@ -230,6 +230,7 @@ class CasesTableUpdater(StandardTableUpdater):
         
         if insert_dicts:
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
+            logger.info("inserting %d cases for domain %s" % (len(deduped), self.domain.name))
             self.insert_chunked(deduped)
             
         for row in update_dicts:
@@ -281,6 +282,7 @@ class FormTableUpdater(StandardTableUpdater):
         
         if insert_dicts:
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
+            logger.info("inserting %d forms for domain %s" % (len(deduped), self.domain.name))
             self.insert_chunked(deduped)
         
         for row in update_dicts:
@@ -306,26 +308,33 @@ class CaseEventTableUpdater(StandardTableUpdater):
     def update_table(self):
         logger.info('TIMESTAMP starting case event table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         ce_q = IncomingForm.select(IncomingForm.form, IncomingForm.case, IncomingForm.alt_case).where(IncomingForm.domain == self.domain.name).execute()
+        ce_pairs = set([(ce.form, ce.case if ce.case else ce.alt_case) for ce in ce_q.iterator()])
         
-        form_id_q = self.domain.forms.select(Form.id, Form.form).execute()
-        form_id_dict = dict([(f.form, f) for f in form_id_q.iterator()])
-        
-        case_id_q = self.domain.cases.select(Cases.id, Cases.case).execute()
-        case_id_dict = dict([(c.case, c) for c in case_id_q.iterator()])
-        
-        existing_formcase_q = CaseEvent.select().join(Form).where(Form.domain == self.domain).join(Cases, on=(CaseEvent.case==Cases.id))
-        existing_formcase_pairs = [(ce.form.form,ce.case.case) for ce in existing_formcase_q.iterator()]
-        
+        cur = CaseEvent._meta.database.execute_sql('select form.form_id, cases.case_id '
+                                                'from form, cases, case_event '
+                                                'where form.id = case_event.form_id '
+                                                'and cases.id = case_event.case_id '
+                                                'and form.domain_id = %d'% self.domain.id)
+        existing_pairs = set(cur.fetchall())
+        pairs_to_insert = ce_pairs.difference(existing_pairs)
         insert_dicts = []
-        for ce_attrs in ce_q.iterator():
-            case_id = ce_attrs.case if ce_attrs.case else ce_attrs.alt_case
-            if ce_attrs.form in form_id_dict and case_id in case_id_dict:
-                row = {'form':form_id_dict[ce_attrs.form], 'case':case_id_dict[case_id]}
-                
-                if (ce_attrs.form,ce_attrs.case) not in existing_formcase_pairs:
-                    insert_dicts.append(row)
+        
+        for pair in pairs_to_insert:
+            
+            try:
+                frm_q = Form.select().where((Form.domain==self.domain) & (Form.form == pair[0]))
+                frm = frm_q.get()
+                cs_q = Cases.select().where((Cases.domain==self.domain) & (Cases.case == pair[1]))
+                cs= cs_q.get()
+                row = {'form':frm, 'case':cs}
+                insert_dicts.append(row)
+            except (Form.DoesNotExist, Cases.DoesNotExist):
+                logger.error("while inserting case event, could not find either form %s or case %s in domain %s" 
+                             % (pair[0], pair[1], self.domain.name))
+            
         
         if insert_dicts:
+            logger.info("inserting %d case events for domain %s" % (len(insert_dicts), self.domain.name))
             self.insert_chunked(insert_dicts)
 
 class VisitTableUpdater(StandardTableUpdater):
@@ -346,22 +355,22 @@ class VisitTableUpdater(StandardTableUpdater):
         vq = Visit.select().where(Visit.user == user).order_by(Visit.time_start.desc()).limit(1)
         if vq.count() > 0:
             v = vq.get()
-            logger.info('deleting most recent visit for user %s with id %d, start time %s' % (user.id, v.id, v.time_start))
+            logger.debug('deleting most recent visit for user %s with id %d, start time %s' % (user.id, v.id, v.time_start))
             dq = Visit.delete().where(Visit.id == v.id)
             dq.execute()
         else:
-            logger.info('no visits to delete for user %s' % user.id)
+            logger.debug('no visits to delete for user %s' % user.id)
         
     def create_visit(self, user, visited_forms):
         
         time_start = min(visited_forms, key=lambda x : x.time_start).time_start
         time_end = max(visited_forms, key=lambda x : x.time_end).time_end
-        v = Visit.create(user=user, time_start = time_start, time_end = time_end)
+        v = Visit.create(user=user, time_start=time_start, time_end=time_end)
         
         for fp in visited_forms:
             fp.visit = v
             fp.save()
-        logger.debug('saved visit with id %d for user %s, %d forms' % (v.id,user.id,len(visited_forms)))
+        logger.debug('saved visit with id %d for user %s, %d forms' % (v.id, user.id, len(visited_forms)))
         
     def update_table(self):
         logger.info('TIMESTAMP starting visit table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
@@ -376,7 +385,7 @@ class VisitTableUpdater(StandardTableUpdater):
         users_prefetch = prefetch(users, forms, ces)
          
         for u in users_prefetch:
-            logger.info("getting visits for user %s" % u.user)
+            logger.debug("getting visits for user %s" % u.user)
             
             # forms already in visit
             prev_visited_forms = []

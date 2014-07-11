@@ -257,9 +257,9 @@ class ExcelImporter(Importer):
             self._incoming_table_class.create(**insert_dict)
             
     def do_cleanup(self):
-        update_q = self._incoming_table_class.update(imported=True)
-        rows= update_q.execute()
-        logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
+        delete_q = self._incoming_table_class.delete()
+        rows= delete_q.execute()
+        logger.info('Deleted %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
 
 
     

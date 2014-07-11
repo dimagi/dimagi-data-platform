@@ -319,18 +319,22 @@ class CaseEventTableUpdater(StandardTableUpdater):
         pairs_to_insert = ce_pairs.difference(existing_pairs)
         insert_dicts = []
         
+        forms_cur = CaseEvent._meta.database.execute_sql('select form.form_id, form.id from form '
+                                                'where form.domain_id = %d'% self.domain.id)
+        forms_dict = dict(set(forms_cur.fetchall()))
+        
+        cases_cur = CaseEvent._meta.database.execute_sql('select cases.case_id, cases.id from cases '
+                                                'where cases.domain_id = %d'% self.domain.id)
+        cases_dict = dict(set(cases_cur.fetchall()))
+        
         for pair in pairs_to_insert:
-            
-            try:
-                frm_q = Form.select().where((Form.domain==self.domain) & (Form.form == pair[0]))
-                frm = frm_q.get()
-                cs_q = Cases.select().where((Cases.domain==self.domain) & (Cases.case == pair[1]))
-                cs= cs_q.get()
-                row = {'form':frm, 'case':cs}
-                insert_dicts.append(row)
-            except (Form.DoesNotExist, Cases.DoesNotExist):
-                logger.error("while inserting case event, could not find either form %s or case %s in domain %s" 
-                             % (pair[0], pair[1], self.domain.name))
+            if pair[0] and pair[1]:
+                if pair[0] in forms_dict and pair[1] in cases_dict: 
+                    row = {'form':forms_dict[pair[0]], 'case':cases_dict[pair[1]]}
+                    insert_dicts.append(row)
+                else :
+                    logger.error("while inserting case event, could not find either form %s or case %s in domain %s" 
+                                 % (pair[0], pair[1], self.domain.name))
             
         
         if insert_dicts:

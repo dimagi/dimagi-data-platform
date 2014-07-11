@@ -57,6 +57,9 @@ def update_platform_data():
         
     for table_updater in table_updaters:
         table_updater.update_table()
+        
+    for importer in importers:
+            importer.do_cleanup()
             
 def run_for_domains(domainlist, password):
     for dname in domainlist:

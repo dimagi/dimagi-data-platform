@@ -22,6 +22,7 @@ class UnknownField(object):
 
 class BaseModel(Model):
     id = PrimaryKeyField(db_column='id')
+    imported = BooleanField(default=False, null=True)
     class Meta:
         database = database
         

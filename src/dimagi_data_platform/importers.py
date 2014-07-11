@@ -112,8 +112,9 @@ class CommCareExportImporter(Importer):
             logger.warn('no table emitted with name %s' % self._get_table_name)
             
     def do_cleanup(self):
-        delete_q = self._incoming_table_class.delete().where(self._incoming_table_class.domain == self.api_client.project)
-        delete_q.execute()
+        update_q = self._incoming_table_class.update(imported=True).where(self._incoming_table_class.domain == self.api_client.project)
+        rows = update_q.execute()
+        logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
             
 class CommCareExportFormImporter(CommCareExportImporter):
     '''
@@ -256,8 +257,9 @@ class ExcelImporter(Importer):
             self._incoming_table_class.create(**insert_dict)
             
     def do_cleanup(self):
-        dq = self._incoming_table_class.delete()
-        dq.execute()
+        update_q = self._incoming_table_class.update(imported=True)
+        rows= update_q.execute()
+        logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
 
 
     

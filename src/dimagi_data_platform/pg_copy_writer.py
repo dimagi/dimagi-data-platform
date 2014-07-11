@@ -96,9 +96,11 @@ class PgCopyWriter(SqlTableWriter):
         conn = self.base_connection
         
         copy_sql = "COPY %s (%s) FROM '%s' WITH CSV HEADER" % (table['name'], headings, abspath)
+        update_imported_sql = "UPDATE %s set imported=FALSE where imported is null" % table['name']
         
         trans = conn.begin()
         conn.execute(copy_sql)
+        conn.execute(update_imported_sql)
         trans.commit()
         
         conn.close()

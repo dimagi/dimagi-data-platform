@@ -126,6 +126,14 @@ class Form(BaseModel):
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms', on_delete='CASCADE')
     xmlns = CharField(max_length=255, null=True)
     
+    app_version = CharField(max_length=255, null=True)
+    closed = BooleanField(null=True)
+    created = BooleanField(null=True)
+    updated = BooleanField(null=True)
+    device = CharField(db_column='device_id', max_length=255, null=True)
+    is_phone_submission = BooleanField(null=True)
+    received_on = DateTimeField(null=True)
+    
     visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='forms', on_delete='SET NULL')
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='forms')
 
@@ -141,6 +149,7 @@ class Cases(BaseModel):
     date_closed = DateTimeField(null=True)
     date_modified = DateTimeField(null=True)
     date_opened = DateTimeField(null=True)
+    
     owner = ForeignKeyField(db_column='owner_id', null=True, rel_model=User, related_name='owned_cases', on_delete='CASCADE')
     parent = CharField(db_column='parent_id', max_length=255, null=True)
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='user_cases', on_delete='CASCADE')

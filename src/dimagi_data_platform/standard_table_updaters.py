@@ -203,8 +203,9 @@ class CasesTableUpdater(StandardTableUpdater):
         user_id_q = self.domain.users.select()
         user_id_dict = dict([(u.user, u) for u in user_id_q])
         
-        existing_cases = self.domain.cases
-        existing_case_ids = [c.case for c in existing_cases]
+        cases_cur = Cases._meta.database.execute_sql('select case_id from cases '
+                                                'where cases.domain_id = %d' % self.domain.id)
+        existing_case_ids = [c[0] for c in cases_cur.fetchall()]
         
         insert_dicts = []
         update_dicts = []
@@ -223,7 +224,8 @@ class CasesTableUpdater(StandardTableUpdater):
                        'date_closed':closed, 'closed':is_closed, 'domain':self.domain}
                 
                 if inccase.case in existing_case_ids:
-                    update_dicts.append(row)
+                    q = Cases.update(**row).where(Cases.case == row['case'])
+                    q.execute()
                 else:
                     insert_dicts.append(row)
             else:
@@ -233,12 +235,6 @@ class CasesTableUpdater(StandardTableUpdater):
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
             logger.info("inserting %d cases for domain %s" % (len(deduped), self.domain.name))
             self.insert_chunked(deduped)
-            
-        for row in update_dicts:
-            q = Cases.update(**row).where(Cases.case == row['case'])
-            q.execute()
-        
-        
 
 class FormTableUpdater(StandardTableUpdater):
     '''
@@ -262,45 +258,39 @@ class FormTableUpdater(StandardTableUpdater):
         user_id_q = self.domain.users.select()
         user_id_dict = dict([(u.user, u) for u in user_id_q])
         
-        existing_forms = self.domain.forms
-        existing_form_ids = [f.form for f in existing_forms]
+        forms_cur = Form._meta.database.execute_sql('select form_id from form '
+                                                'where form.domain_id = %d' % self.domain.id)
+        existing_form_ids = [f[0] for f in forms_cur.fetchall()]
         
         insert_dicts = []
-        update_dicts = []
+        
         for incform in incform_q.iterator():
-            if incform.user in user_id_dict:
-                start = datetime.datetime.strptime(incform.time_start, '%Y-%m-%dT%H:%M:%S') if incform.time_start else None
-                end = datetime.datetime.strptime(incform.time_end, '%Y-%m-%dT%H:%M:%S') if incform.time_end else None
-                rec = datetime.datetime.strptime(incform.received_on, '%Y-%m-%dT%H:%M:%S') if incform.received_on else None
-                
-                created = (incform.created == "True")
-                updated = (incform.updated == "True")
-                closed = (incform.closed == "True")
-                phone = (incform.is_phone_submission == "1.0")
-                
-                row = {'form':incform.form, 'xmlns':incform.xmlns, 'app':incform.app,
-                       'time_start':start, 'time_end':end, 'received_on':rec,
-                       'created':created, 'updated':updated, 'closed':closed,
-                       'app_version':incform.app_version, 'is_phone_submission': phone,
-                       'device':incform.device, 'user':user_id_dict[incform.user], 'domain':self.domain}
-                
-                if incform.form in existing_form_ids:
-                    update_dicts.append(row)
-                else:
+            if incform.form not in existing_form_ids:
+                if incform.user in user_id_dict:
+                    start = datetime.datetime.strptime(incform.time_start, '%Y-%m-%dT%H:%M:%S') if incform.time_start else None
+                    end = datetime.datetime.strptime(incform.time_end, '%Y-%m-%dT%H:%M:%S') if incform.time_end else None
+                    rec = datetime.datetime.strptime(incform.received_on, '%Y-%m-%dT%H:%M:%S') if incform.received_on else None
+                    
+                    created = (incform.created == "True")
+                    updated = (incform.updated == "True")
+                    closed = (incform.closed == "True")
+                    phone = (incform.is_phone_submission == "1.0")
+                    
+                    row = {'form':incform.form, 'xmlns':incform.xmlns, 'app':incform.app,
+                           'time_start':start, 'time_end':end, 'received_on':rec,
+                           'created':created, 'updated':updated, 'closed':closed,
+                           'app_version':incform.app_version, 'is_phone_submission': phone,
+                           'device':incform.device, 'user':user_id_dict[incform.user], 'domain':self.domain}
+                    
                     insert_dicts.append(row)
-            else:
-                logger.warn("while inserting form with ID %s for domain %s couldn't find user. user ID is %s" % (incform.form, incform.domain, incform.user))
+                else:
+                    logger.warn("while inserting form with ID %s for domain %s couldn't find user. user ID is %s" % (incform.form, incform.domain, incform.user))
         
         
         if insert_dicts:
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
             logger.info("inserting %d forms for domain %s" % (len(deduped), self.domain.name))
             self.insert_chunked(deduped)
-        
-        for row in update_dicts:
-            logger.debug('updating form with dict %s' % row)
-            q = Form.update(**row).where(Form.form == row['form'])
-            q.execute()
 
 
 class CaseEventTableUpdater(StandardTableUpdater):

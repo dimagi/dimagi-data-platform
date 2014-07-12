@@ -408,7 +408,7 @@ class VisitTableUpdater(StandardTableUpdater):
             self.delete_most_recent(usr)
         
         forms = Form.select().where(~(Form.time_end >> None) & ~(Form.time_start >> None) & (Form.visit >> None)).order_by(Form.time_start)
-        ces = CaseEvent.select().join(Cases)
+        ces = CaseEvent.select()
         
         users_prefetch = prefetch(users, forms, ces)
          

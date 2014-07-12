@@ -383,9 +383,10 @@ class VisitTableUpdater(StandardTableUpdater):
         time_end = max(visited_forms, key=lambda x : x.time_end).time_end
         v = Visit.create(user=user, time_start=time_start, time_end=time_end)
         
-        for fp in visited_forms:
-            fp.visit = v
-            fp.save()
+        ids = [f.id for f in visited_forms]
+        uq = Form.update(visit=v).where(Form.id << ids)
+        uq.execute()
+
         logger.debug('saved visit with id %d for user %s, %d forms' % (v.id, user.id, len(visited_forms)))
         
     def update_table(self):
@@ -406,22 +407,19 @@ class VisitTableUpdater(StandardTableUpdater):
         
         for usr in users:
             self.delete_most_recent(usr)
-        
-        forms = Form.select().where(~(Form.time_end >> None) & ~(Form.time_start >> None) & (Form.visit >> None)).order_by(Form.time_start)
-        ces = CaseEvent.select()
-        
-        users_prefetch = prefetch(users, forms, ces)
-         
-        for u in users_prefetch:
-            logger.debug("getting visits for user %s" % u.user)
+            
+            logger.debug("getting visits for user %s" % usr.user)
             
             # forms already in visit
             prev_visited_forms = []
             # cases and parents of cases in forms already in visit
             prev_visited_case_ids = []
             
-            for frm in u.forms_prefetch:
-                
+            forms = usr.forms.select().where(~(Form.time_end >> None) & ~(Form.time_start >> None) & (Form.visit >> None)).order_by(Form.time_start)
+            ces = CaseEvent.select()
+            forms_prefetch = prefetch(forms, ces)
+            
+            for frm in forms_prefetch:
                 case_events = frm.caseevents_prefetch
                 if len(case_events) > 0:
                     # cases updated in this form
@@ -442,11 +440,11 @@ class VisitTableUpdater(StandardTableUpdater):
                     # otherwise save the previous visit and create new lists of forms and cases for a new visit
                     else:
                         if prev_visited_forms:
-                            previous_visit = self.create_visit(u, prev_visited_forms)
+                            previous_visit = self.create_visit(usr, prev_visited_forms)
                             
                         prev_visited_case_ids = form_case_ids + form_case_parents
                         prev_visited_forms = [frm]
             
             # save the last visit for this user
             if prev_visited_forms:
-                previous_visit = self.create_visit(u, prev_visited_forms)      
+                previous_visit = self.create_visit(usr, prev_visited_forms)      

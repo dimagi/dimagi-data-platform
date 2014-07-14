@@ -112,7 +112,7 @@ class CommCareExportImporter(Importer):
             logger.warn('no table emitted with name %s' % self._get_table_name)
             
     def do_cleanup(self):
-        update_q = self._incoming_table_class.update(imported=True).where(self._incoming_table_class.domain == self.api_client.project)
+        update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.domain == self.api_client.project) & ~(self._incoming_table_class.imported==True))
         rows = update_q.execute()
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
             

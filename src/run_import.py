@@ -62,40 +62,46 @@ def update_platform_data():
             importer.do_cleanup()
             
 def run_for_domains(domainlist, password):
+    now = datetime.datetime.now()
+    current_month_start = datetime.datetime(now.year,now.month,1)
     for dname in domainlist:
-        
         try:
             d = Domain.get(name=dname)
             since = d.last_hq_import
+            
+            if ((not since) or (since < current_month_start)):
     
-            logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
-            
-            api_client = CommCareHqClient('https://www.commcarehq.org', dname).authenticated(conf.CC_USER, password)
-            
-            importers = []
-            importers.append(CommCareExportCaseImporter(api_client, since))
-            importers.append(CommCareExportFormImporter(api_client, since))
-        
-            for importer in importers:
-                importer.do_import()
-            
-            d.last_hq_import = datetime.datetime.now()
-            d.save()
-    
-            table_updaters = []
-            table_updaters.append(UserTableUpdater(dname))
-            table_updaters.append(FormTableUpdater(dname))
-            table_updaters.append(CasesTableUpdater(dname))
-            table_updaters.append(CaseEventTableUpdater(dname))
-            table_updaters.append(VisitTableUpdater(dname))
-            
-            logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
-            for table_updater in table_updaters:
-                table_updater.update_table()
+                logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
                 
-            for importer in importers:
-                importer.do_cleanup()
+                api_client = CommCareHqClient('https://www.commcarehq.org', dname).authenticated(conf.CC_USER, password)
+                
+                importers = []
+                importers.append(CommCareExportCaseImporter(api_client, since))
+                importers.append(CommCareExportFormImporter(api_client, since))
             
+                for importer in importers:
+                    importer.do_import()
+                
+                d.last_hq_import = datetime.datetime.now()
+                d.save()
+        
+                table_updaters = []
+                table_updaters.append(UserTableUpdater(dname))
+                table_updaters.append(FormTableUpdater(dname))
+                table_updaters.append(CasesTableUpdater(dname))
+                table_updaters.append(CaseEventTableUpdater(dname))
+                table_updaters.append(VisitTableUpdater(dname))
+                
+                logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
+                for table_updater in table_updaters:
+                    table_updater.update_table()
+                    
+                for importer in importers:
+                    importer.do_cleanup()
+                
+            else:
+                logger.info('Already have data before month start %s (latest is %s) for domain %s' % (current_month_start, since, d.name))
+                
         except Exception, e:
                 logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % d.name)
                 logger.exception(e)

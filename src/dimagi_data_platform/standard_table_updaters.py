@@ -198,8 +198,7 @@ class CasesTableUpdater(StandardTableUpdater):
         
     def update_table(self):
         logger.info('TIMESTAMP starting cases table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
-        inccases_q = IncomingCases.select().where((IncomingCases.domain == self.domain.name) 
-                                                  & ((IncomingCases.imported == False) | (IncomingCases.imported >> None)))
+        inccases_q = IncomingCases.get_unimported(self.domain.name)
         logger.info('Incoming cases table has %d records not imported' % inccases_q.count())
         
         user_id_q = self.domain.users.select()
@@ -254,8 +253,7 @@ class FormTableUpdater(StandardTableUpdater):
         
     def update_table(self):
         logger.info('TIMESTAMP starting form table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
-        incform_q = IncomingForm.select().where((IncomingForm.domain == self.domain.name) & 
-                                                ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
+        incform_q = IncomingForm.get_unimported(self.domain.name)
         logger.info('Incoming form table has %d records not imported' % incform_q.count())
         
         user_id_q = self.domain.users.select()

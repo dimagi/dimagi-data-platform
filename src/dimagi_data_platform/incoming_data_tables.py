@@ -32,6 +32,13 @@ class BaseModel(Model):
     class Meta:
         database = database
         
+class BaseDomainLinkedModel(BaseModel):
+    domain = CharField(max_length=255, null=True)
+    
+    @classmethod
+    def get_unimported(cls, dname):
+        return cls.select().where((cls.domain == dname) & ((cls.imported == False) | (cls.imported >> None)))
+        
 models = []
 
 class IncomingDomain(BaseModel):
@@ -56,7 +63,7 @@ class IncomingFormAnnotation(BaseModel):
         db_table = 'incoming_form_annotation'
 models.append(IncomingFormAnnotation)
 
-class IncomingCases(BaseModel):
+class IncomingCases(BaseDomainLinkedModel):
     api = CharField(db_column='api_id', max_length=255, null=True)
     case = CharField(db_column='case_id', max_length=255, null=True)
     case_type = CharField(max_length=255, null=True)
@@ -64,7 +71,7 @@ class IncomingCases(BaseModel):
     date_closed = CharField(max_length=255, null=True)
     date_modified = CharField(max_length=255, null=True)
     date_opened = CharField(max_length=255, null=True)
-    domain = CharField(max_length=255, null=True)
+    
     owner = CharField(db_column='owner_id', max_length=255, null=True)
     parent = CharField(db_column='parent_id', max_length=255, null=True)
     user = CharField(db_column='user_id', max_length=255, null=True)
@@ -73,7 +80,7 @@ class IncomingCases(BaseModel):
         db_table = 'incoming_cases'
 models.append(IncomingCases)
 
-class IncomingForm(BaseModel):
+class IncomingForm(BaseDomainLinkedModel):
     app = CharField(db_column='app_id', max_length=255, null=True)
     app_version = CharField(max_length=255, null=True)
     case = CharField(db_column='case_id', max_length=255, null=True)
@@ -81,7 +88,7 @@ class IncomingForm(BaseModel):
     closed = CharField(max_length=255, null=True)
     created = CharField(max_length=255, null=True)
     device = CharField(db_column='device_id', max_length=255, null=True)
-    domain = CharField(max_length=255, null=True)
+    
     form = CharField(db_column='form_id', max_length=255, null=True)
     is_phone_submission = CharField(max_length=255, null=True)
     received_on = CharField(max_length=255, null=True)

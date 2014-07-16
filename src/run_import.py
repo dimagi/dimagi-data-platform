@@ -90,10 +90,11 @@ def run_for_domains(domainlist, password):
             else:
                 logger.info('Already have data before month start %s (latest is %s) for domain %s' % (current_month_start, since, d.name))
             
-            forms_to_import = IncomingForm.get_unimported().count()
-            cases_to_import = IncomingCases.get_unimported().count()
+            forms_to_import = IncomingForm.get_unimported(dname).count()
+            cases_to_import = IncomingCases.get_unimported(dname).count()
             
             if (forms_to_import > 0) or (cases_to_import >0):
+                logger.info('We have %d forms and %d cases to import' % (forms_to_import, cases_to_import))
                 table_updaters = []
                 table_updaters.append(UserTableUpdater(dname))
                 table_updaters.append(FormTableUpdater(dname))

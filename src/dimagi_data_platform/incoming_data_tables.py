@@ -13,6 +13,7 @@ from playhouse.postgres_ext import *
 
 from dimagi_data_platform import conf
 
+
 logger = logging.getLogger('peewee')
 
 database = conf.PEEWEE_DB_CON
@@ -23,6 +24,11 @@ class UnknownField(object):
 class BaseModel(Model):
     id = PrimaryKeyField(db_column='id')
     imported = BooleanField(default=False, null=True)
+    
+    @classmethod
+    def get_unimported(cls):
+        return cls.select().where((cls.imported == False) | (cls.imported >> None))
+    
     class Meta:
         database = database
         

@@ -57,7 +57,7 @@ class DomainTableUpdater(StandardTableUpdater):
     
     def update_table(self):
         
-        for row in IncomingDomain.select().where(~(IncomingDomain.imported == True)):
+        for row in IncomingDomain.get_unimported():
             attrs = row.attributes
 
             dname = attrs['Project']
@@ -76,7 +76,7 @@ class DomainTableUpdater(StandardTableUpdater):
                 
                 domain.save()
             
-        for row in IncomingDomainAnnotation.select().where(~(IncomingDomainAnnotation.imported == True)):
+        for row in IncomingDomainAnnotation.get_unimported():
             
             attrs = row.attributes
             dname = attrs['Domain name']
@@ -117,7 +117,7 @@ class FormDefTableUpdater(StandardTableUpdater):
     
     def update_table(self):
         
-        for row in IncomingFormAnnotation.select().where(~(IncomingFormAnnotation.imported == True)):
+        for row in IncomingFormAnnotation.get_unimported():
             attrs = row.attributes
             xmlns = attrs['Form xmlns']
             app_id = attrs['Application ID']
@@ -170,10 +170,11 @@ class UserTableUpdater(StandardTableUpdater):
     def update_table(self):
         logger.info('TIMESTAMP starting user table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         
-        case_users = IncomingCases.select(IncomingCases.user).where((IncomingCases.domain == self.domain.name) & ~(IncomingCases.imported == True))
-        case_owners = IncomingCases.select(IncomingCases.owner).where((IncomingCases.domain == self.domain.name) & ~(IncomingCases.imported == True))
-        form_users = IncomingForm.select(IncomingForm.user).where((IncomingForm.domain == self.domain.name) & ~(IncomingForm.imported == True))
-        incoming_user_ids = set([u.user for u in case_users] + [o.owner for o in case_owners] + [f.user for f in form_users])
+        case_users = IncomingCases.select(IncomingCases.user, IncomingCases.owner).where((IncomingCases.domain == self.domain.name) 
+                                                                                         & ((IncomingCases.imported == False) | (IncomingCases.imported >> None)))
+        
+        form_users = IncomingForm.select(IncomingForm.user).where((IncomingForm.domain == self.domain.name) & ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
+        incoming_user_ids = set([u.user for u in case_users] + [o.owner for o in case_users] + [f.user for f in form_users])
         
         existing_user_ids = set([u.user for u in self.domain.users])
         user_ids_to_create = incoming_user_ids.difference(existing_user_ids)
@@ -197,7 +198,8 @@ class CasesTableUpdater(StandardTableUpdater):
         
     def update_table(self):
         logger.info('TIMESTAMP starting cases table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
-        inccases_q = IncomingCases.select().where((IncomingCases.domain == self.domain.name) & ~(IncomingCases.imported == True))
+        inccases_q = IncomingCases.select().where((IncomingCases.domain == self.domain.name) 
+                                                  & ((IncomingCases.imported == False) | (IncomingCases.imported >> None)))
         logger.info('Incoming cases table has %d records not imported' % inccases_q.count())
         
         user_id_q = self.domain.users.select()
@@ -252,7 +254,8 @@ class FormTableUpdater(StandardTableUpdater):
         
     def update_table(self):
         logger.info('TIMESTAMP starting form table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
-        incform_q = IncomingForm.select().where((IncomingForm.domain == self.domain.name) & ~(IncomingForm.imported == True))
+        incform_q = IncomingForm.select().where((IncomingForm.domain == self.domain.name) & 
+                                                ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
         logger.info('Incoming form table has %d records not imported' % incform_q.count())
         
         user_id_q = self.domain.users.select()
@@ -309,7 +312,8 @@ class CaseEventTableUpdater(StandardTableUpdater):
         
     def update_table(self):
         logger.info('TIMESTAMP starting case event table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
-        ce_q = IncomingForm.select(IncomingForm.form, IncomingForm.case, IncomingForm.alt_case).where((IncomingForm.domain == self.domain.name) & ~(IncomingForm.imported == True))
+        ce_q = IncomingForm.select(IncomingForm.form, IncomingForm.case, IncomingForm.alt_case).where((IncomingForm.domain == self.domain.name) 
+                                                                                                      & ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
         ce_pairs = set([(ce.form, ce.case if ce.case else ce.alt_case) for ce in ce_q.iterator()])
         
         cur = CaseEvent._meta.database.execute_sql('select form.form_id, cases.case_id '

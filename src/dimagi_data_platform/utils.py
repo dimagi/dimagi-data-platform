@@ -48,7 +48,7 @@ def get_domains(domain_conf_json):
         filter_lists = []
         
         for filter in filters:
-            filter_by = filter['filter_by']
+            filter_by = filter['filterby']
             values = filter['values']
             values_list = [v.strip() for v in values.split(',')]
             

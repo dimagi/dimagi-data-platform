@@ -51,7 +51,7 @@ class Importer(object):
         '''
         returns the names of all columns except the hstores
         '''
-        cols = [v.db_column for k, v in self._incoming_table_class._meta.fields.iteritems() if not isinstance(v,HStoreField)]
+        cols = [v.db_column for k, v in self._incoming_table_class._meta.fields.iteritems() if not isinstance(v, HStoreField)]
         return cols
     
     @property       
@@ -60,7 +60,7 @@ class Importer(object):
         returns the name of the first hstore col found in the table.
         there should only be one - it's just a place to dump attributes we don't have a column for
         '''
-        hstorecols = [v.db_column for k, v in self._incoming_table_class._meta.fields.iteritems() if isinstance(v,HStoreField)]
+        hstorecols = [v.db_column for k, v in self._incoming_table_class._meta.fields.iteritems() if isinstance(v, HStoreField)]
         if hstorecols:
             return hstorecols[0]
         
@@ -75,11 +75,11 @@ class CommCareExportImporter(Importer):
     An importer that uses commcare-export
     '''
 
-    def __init__(self, incoming_table_class, api_client, since):
+    def __init__(self, incoming_table_class, since, domain):
         '''
         Constructor
         '''
-        self.api_client = api_client
+        self.domain = domain
         self.since = since
         self._incoming_table_class = incoming_table_class
         
@@ -88,6 +88,9 @@ class CommCareExportImporter(Importer):
     @property
     def _get_query(self):
         pass
+    
+    def set_api_client(self, api_client):
+        self.api_client = api_client
     
     def do_import(self):
         
@@ -112,7 +115,8 @@ class CommCareExportImporter(Importer):
             logger.warn('no table emitted with name %s' % self._get_table_name)
             
     def do_cleanup(self):
-        update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.domain == self.api_client.project) & ~(self._incoming_table_class.imported==True))
+        update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.domain == self.domain) 
+                                                                          & ((self._incoming_table_class.imported == False) | (self._incoming_table_class.imported >> None)))
         rows = update_q.execute()
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
             
@@ -123,11 +127,11 @@ class CommCareExportFormImporter(CommCareExportImporter):
 
     _incoming_table_class = IncomingForm
     
-    def __init__(self, api_client, since):
+    def __init__(self, since, domain):
         '''
         Constructor
         '''
-        super(CommCareExportFormImporter, self).__init__(self._incoming_table_class,api_client,since)
+        super(CommCareExportFormImporter, self).__init__(self._incoming_table_class, since, domain)
     
     @property
     def _get_query(self):
@@ -176,15 +180,15 @@ class CommCareExportCaseImporter(CommCareExportImporter):
 
     _incoming_table_class = IncomingCases
     
-    def __init__(self, api_client, since):
+    def __init__(self, since, domain):
         '''
         Constructor
         '''  
-        super(CommCareExportCaseImporter,self).__init__( self._incoming_table_class, api_client,since)
+        super(CommCareExportCaseImporter, self).__init__(self._incoming_table_class, since, domain)
     
     @property
     def _get_query(self):
-        case_query = Emit(table=self._get_table_name, 
+        case_query = Emit(table=self._get_table_name,
                    headings=[Literal('api_id'),
                              Literal('case_id'),
                              Literal('closed'),
@@ -196,7 +200,7 @@ class CommCareExportCaseImporter(CommCareExportImporter):
                              Literal('case_type'),
                              Literal('owner_id'),
                              Literal('parent_id')],
-                   source=Map(source=Apply(Reference('api_data'),Literal('case')),
+                   source=Map(source=Apply(Reference('api_data'), Literal('case')),
                               body=List([Reference('id'),
                              Reference('case_id'),
                              Reference('closed'),
@@ -248,8 +252,8 @@ class ExcelImporter(Importer):
         hstore_keys = [h for h in self._get_workbook_keys() if h not in self._get_db_cols]
         
         for row in self._get_workbook_rowdicts():
-            db_col_dict = dict((k,v) for k,v in row.iteritems() if k in db_col_keys)
-            hstore_col_dict = dict((k,unicode(v)) for k,v in row.iteritems() if k in hstore_keys)
+            db_col_dict = dict((k, v) for k, v in row.iteritems() if k in db_col_keys)
+            hstore_col_dict = dict((k, unicode(v)) for k, v in row.iteritems() if k in hstore_keys)
             
             insert_dict = db_col_dict
             insert_dict[self._get_hstore_db_col] = hstore_col_dict
@@ -258,7 +262,7 @@ class ExcelImporter(Importer):
             
     def do_cleanup(self):
         delete_q = self._incoming_table_class.delete()
-        rows= delete_q.execute()
+        rows = delete_q.execute()
         logger.info('Deleted %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
 
 

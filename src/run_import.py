@@ -16,7 +16,8 @@ from dimagi_data_platform.data_warehouse_db import Domain
 from dimagi_data_platform.importers import ExcelImporter, \
     CommCareExportCaseImporter, CommCareExportFormImporter
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
-    IncomingDomainAnnotation, IncomingFormAnnotation
+    IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \
+    IncomingCases
 from dimagi_data_platform.standard_table_updaters import DomainTableUpdater, \
     UserTableUpdater, FormTableUpdater, CasesTableUpdater, CaseEventTableUpdater, \
     VisitTableUpdater, FormDefTableUpdater
@@ -69,22 +70,30 @@ def run_for_domains(domainlist, password):
             d = Domain.get(name=dname)
             since = d.last_hq_import
             
+            importers = []
+            importers.append(CommCareExportCaseImporter(since, dname))
+            importers.append(CommCareExportFormImporter(since, dname))
+            
             if ((not since) or (since < current_month_start)):
     
                 logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
                 
                 api_client = CommCareHqClient('https://www.commcarehq.org', dname).authenticated(conf.CC_USER, password)
                 
-                importers = []
-                importers.append(CommCareExportCaseImporter(api_client, since))
-                importers.append(CommCareExportFormImporter(api_client, since))
-            
                 for importer in importers:
+                    importer.set_api_client(api_client)
                     importer.do_import()
                 
                 d.last_hq_import = datetime.datetime.now()
                 d.save()
-        
+            
+            else:
+                logger.info('Already have data before month start %s (latest is %s) for domain %s' % (current_month_start, since, d.name))
+            
+            forms_to_import = IncomingForm.get_unimported().count()
+            cases_to_import = IncomingCases.get_unimported().count()
+            
+            if (forms_to_import > 0) or (cases_to_import >0):
                 table_updaters = []
                 table_updaters.append(UserTableUpdater(dname))
                 table_updaters.append(FormTableUpdater(dname))
@@ -98,9 +107,8 @@ def run_for_domains(domainlist, password):
                     
                 for importer in importers:
                     importer.do_cleanup()
-                
             else:
-                logger.info('Already have data before month start %s (latest is %s) for domain %s' % (current_month_start, since, d.name))
+                logger.info('No forms or cases to import for domain %s' % (d.name))
                 
         except Exception, e:
                 logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % d.name)
@@ -120,16 +128,6 @@ def main():
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
         run_for_domains(domain_list, password)
-        
-        r_script_path = os.path.abspath('R/')
-        conf_path = os.path.abspath('.')
-        
-        logger.info('TIMESTAMP starting report run %s' % datetime.datetime.now())
-        for report in conf.REPORTS:
-            run_proccess_and_log('Rscript', [os.path.join(r_script_path, 'r_script_runner.R'), '%s.R' % report, r_script_path, conf_path, ','.join(["'%s'" % n for n in domain_list])])
-        
-        logger.info('TIMESTAMP aws sync %s' % datetime.datetime.now())
-        run_proccess_and_log('aws', ['s3', 'sync', conf.OUTPUT_DIR, conf.AWS_S3_OUTPUT_URL])
     
 if __name__ == '__main__':
     main()

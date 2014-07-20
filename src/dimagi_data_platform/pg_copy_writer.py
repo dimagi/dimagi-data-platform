@@ -14,6 +14,8 @@ import os
 
 from commcare_export.writers import TableWriter, SqlTableWriter
 import six
+import sqlalchemy
+from sqlalchemy.orm.session import sessionmaker
 
 from dimagi_data_platform import conf
 
@@ -93,14 +95,17 @@ class PgCopyWriter(SqlTableWriter):
             abspath = os.path.abspath(csv_file.name)
             headings = csv_file.readline()
         
-        conn = self.base_connection
+        engine = sqlalchemy.create_engine(conf.SQLALCHEMY_DB_URL)
+        session = sessionmaker(bind=engine)
         
-        copy_sql = "COPY %s (%s) FROM '%s' WITH CSV HEADER" % (table['name'], headings, abspath)
+        copy_file = open(abspath,'r')
+        copy_sql = "COPY %s (%s) FROM STDIN DELIMITER ',' CSV HEADER" % (table['name'], headings)
         update_imported_sql = "UPDATE %s set imported=FALSE where imported is null" % table['name']
         
-        trans = conn.begin()
-        conn.execute(copy_sql)
-        conn.execute(update_imported_sql)
-        trans.commit()
-        
-        conn.close()
+        raw_conn = engine.raw_connection()
+        raw_cur = raw_conn.cursor()
+        raw_cur.copy_expert(copy_sql, copy_file)
+        raw_cur.execute(update_imported_sql)
+        raw_conn.commit()
+        raw_cur.close()
+        raw_conn.close()

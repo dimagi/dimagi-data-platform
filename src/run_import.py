@@ -63,8 +63,7 @@ def update_platform_data():
             importer.do_cleanup()
             
 def run_for_domains(domainlist, password):
-    now = datetime.datetime.now()
-    current_month_start = datetime.datetime(now.year,now.month,1)
+    
     for dname in domainlist:
         try:
             d = Domain.get(name=dname)
@@ -74,21 +73,18 @@ def run_for_domains(domainlist, password):
             importers.append(CommCareExportCaseImporter(since, dname))
             importers.append(CommCareExportFormImporter(since, dname))
             
-            if ((not since) or (since < current_month_start)):
-    
-                logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
-                
-                api_client = CommCareHqClient('https://www.commcarehq.org', dname).authenticated(conf.CC_USER, password)
-                
-                for importer in importers:
-                    importer.set_api_client(api_client)
-                    importer.do_import()
-                
-                d.last_hq_import = datetime.datetime.now()
-                d.save()
             
-            else:
-                logger.info('Already have data before month start %s (latest is %s) for domain %s' % (current_month_start, since, d.name))
+    
+            logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
+            
+            api_client = CommCareHqClient('https://www.commcarehq.org', dname).authenticated(conf.CC_USER, password)
+            
+            for importer in importers:
+                importer.set_api_client(api_client)
+                importer.do_import()
+            
+            d.last_hq_import = datetime.datetime.now()
+            d.save()
             
             forms_to_import = IncomingForm.get_unimported(dname).count()
             cases_to_import = IncomingCases.get_unimported(dname).count()

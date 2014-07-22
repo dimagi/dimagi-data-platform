@@ -97,8 +97,9 @@ class DomainTableUpdater(StandardTableUpdater):
                 try:
                     domain = Domain.get(name=dname)
                     domain.business_unit = business_unit
+                    
                     if domain.attributes:
-                        domain.attributes = domain.attributes.update(attrs)
+                        domain.attributes.update(attrs)
                     else:
                         domain.attributes = attrs
                     

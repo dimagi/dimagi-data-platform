@@ -59,52 +59,68 @@ class DomainTableUpdater(StandardTableUpdater):
         
         for row in IncomingDomain.get_unimported():
             attrs = row.attributes
-
-            dname = attrs['Project']
             
-            if dname not in self._first_col_names_to_skip:
-                try:
-                    domain = Domain.get(name=dname)
-                except Domain.DoesNotExist:
-                    domain = Domain.create(name=dname)
+            if not 'Project' in attrs:
+                logger.warn('Must have Project to save domain, but we only have  %s' % attrs)
+            else:
+                dname = attrs['Project']
                 
-                domain.organization = attrs['Organization']
-                domain.country = attrs['Deployment Country']
-                domain.services = attrs['Services']
-                domain.project_state = attrs['Project State']
-                domain.attributes = attrs
-                
-                domain.save()
+                if dname not in self._first_col_names_to_skip:
+                    try:
+                        domain = Domain.get(name=dname)
+                    except Domain.DoesNotExist:
+                        domain = Domain.create(name=dname)
+                    
+                    domain.organization = attrs['Organization'] if 'Organization' in attrs else None
+                    domain.country = attrs['Deployment Country'] if 'Deployment Country' in attrs else None
+                    domain.services = attrs['Services'] if 'Services' in attrs else None
+                    domain.project_state = attrs['Project State'] if 'Project State' in attrs else None
+                    domain.attributes = attrs
+                    
+                    domain.save()
             
         for row in IncomingDomainAnnotation.get_unimported():
             
             attrs = row.attributes
-            dname = attrs['Domain name']
-            business_unit = attrs['Business unit']
-            sector_names = [k.replace('Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sector_') & (v == 'Yes'))]
             
-            try:
-                domain = Domain.get(name=dname)
-                domain.business_unit = business_unit
-                if domain.attributes:
-                    domain.attributes = domain.attributes.update(attrs)
-                else:
-                    domain.attributes = attrs
-            
-                for secname in sector_names:
-                    try:
-                        sec = Sector.get(name=secname)
-                    except Sector.DoesNotExist:
-                        sec = Sector(name=secname)
-                        sec.save()
-                    try:
-                        ds = DomainSector.get(domain=domain, sector=sec)
-                    except DomainSector.DoesNotExist:
-                        ds = DomainSector(domain=domain, sector=sec)
-                        ds.save()
-            
-            except Domain.DoesNotExist:
-                logger.warn('Domain referenced i domain annotations table with name %s, does not exist' % (dname))
+            if not 'Domain name' in attrs:
+                logger.warn('Must have Domain name to save domain annotations, but we only have  %s' % attrs)
+            else:
+                dname = attrs['Domain name']
+                business_unit = attrs['Business unit'] if 'Business unit' in attrs else None
+                sector_names_annotations = [k.replace('Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sector_') & (v == 'Yes'))]
+                
+                sector_name_hq = [attrs["HQ_Sector"]] if "HQ_Sector" in attrs else []
+                sector_names=list()+sector_name_hq+sector_names_annotations
+                sector_names = [s for s in sector_names if (s is not None and not (s == ""))]
+                
+                try:
+                    domain = Domain.get(name=dname)
+                    domain.business_unit = business_unit
+                    if domain.attributes:
+                        domain.attributes = domain.attributes.update(attrs)
+                    else:
+                        domain.attributes = attrs
+                    
+                    
+                    dq = DomainSector.delete().where(DomainSector.domain == domain)
+                    dq.execute()
+                    
+                    for secname in sector_names:
+                        try:
+                            sec = Sector.get(name=secname)
+                        except Sector.DoesNotExist:
+                            sec = Sector(name=secname)
+                            sec.save()
+                        try:
+                            ds = DomainSector.get(domain=domain, sector=sec)
+                        except DomainSector.DoesNotExist:
+                            ds = DomainSector(domain=domain, sector=sec)
+                            ds.save()
+                    domain.save()
+
+                except Domain.DoesNotExist:
+                    logger.warn('Domain referenced i domain annotations table with name %s, does not exist' % (dname))
                 
 class FormDefTableUpdater(StandardTableUpdater):
     '''
@@ -119,37 +135,46 @@ class FormDefTableUpdater(StandardTableUpdater):
         
         for row in IncomingFormAnnotation.get_unimported():
             attrs = row.attributes
-            xmlns = attrs['Form xmlns']
-            app_id = attrs['Application ID']
-            dname = attrs['Domain name']
-            subsector_names = [k.replace('Subsector_', '') for k, v in attrs.iteritems() if (k.startswith('Subsector_') & (v == 'Yes'))]
             
-            try:
-                domain = Domain.get(name=dname)
+            if not ('Form xmlns' in attrs and 'Application ID' in attrs and 'Domain name' in attrs):
+                logger.warn('Must have Form xmlns, Application ID and Domain name to save form annotation, but we only have %s' % attrs)
+
+            else:
+                xmlns = attrs['Form xmlns']
+                app_id = attrs['Application ID']
+                dname = attrs['Domain name']
+                subsector_names = [k.replace('Subsector_', '') for k, v in attrs.iteritems() if (k.startswith('Subsector_') & (v == 'Yes'))]
                 
                 try:
-                    fd = FormDefinition.get(xmlns=xmlns, app_id=app_id, domain=domain)
-                except FormDefinition.DoesNotExist:
-                    fd = FormDefinition(xmlns=xmlns, app_id=app_id, domain=domain)
-                
-                fd.attributes = attrs
-                fd.save()
-                
-                for sname in subsector_names:
-                    try:
-                        sub = Subsector.get(name=sname)
-                    except Subsector.DoesNotExist:
-                        sub = Subsector(name=sname)
-                        sub.save()
+                    domain = Domain.get(name=dname)
                     
                     try:
-                        fs = FormDefinitionSubsector.get(formdef=fd, subsector=sub)     
-                    except FormDefinitionSubsector.DoesNotExist:
-                        fs = FormDefinitionSubsector(formdef=fd, subsector=sub)
-                        fs.save()
+                        fd = FormDefinition.get(xmlns=xmlns, app_id=app_id, domain=domain)
+                    except FormDefinition.DoesNotExist:
+                        fd = FormDefinition(xmlns=xmlns, app_id=app_id, domain=domain)
                     
-            except Domain.DoesNotExist:
-                logger.warn('Domain with name %s does not exist, could not add Form Definition with xmlns %s and app ID %s' % (dname, xmlns, app_id))
+                    fd.attributes = attrs
+                    fd.save()
+                    
+                    dq = FormDefinitionSubsector.delete().where(FormDefinitionSubsector.formdef == fd)
+                    dq.execute()
+                    
+                    for sname in subsector_names:
+                        try:
+                            sub = Subsector.get(name=sname)
+                        except Subsector.DoesNotExist:
+                            sub = Subsector(name=sname)
+                            sub.save()
+                        
+                        try:
+                            fs = FormDefinitionSubsector.get(formdef=fd, subsector=sub)     
+                        except FormDefinitionSubsector.DoesNotExist:
+                            fs = FormDefinitionSubsector(formdef=fd, subsector=sub)
+                            fs.save()
+                    fd.save()
+      
+                except Domain.DoesNotExist:
+                    logger.warn('Domain with name %s does not exist, could not add Form Definition with xmlns %s and app ID %s' % (dname, xmlns, app_id))
 
 
 class UserTableUpdater(StandardTableUpdater):

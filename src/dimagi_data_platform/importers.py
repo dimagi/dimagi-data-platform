@@ -10,6 +10,8 @@ from commcare_export.commcare_minilinq import CommCareHqEnv
 from commcare_export.env import BuiltInEnv, JsonPathEnv
 from commcare_export.minilinq import Emit, Literal, Map, FlatMap, Reference, \
     Apply, List
+import numpy
+from pandas.core.common import notnull
 from pandas.io.excel import ExcelFile
 from playhouse.postgres_ext import HStoreField
 import sqlalchemy
@@ -237,7 +239,12 @@ class ExcelImporter(Importer):
         '''
         returns list of key-value dicts from keys in first row
         '''
-        return self.workbook.parse().to_dict(outtype='records')
+        rows = self.workbook.parse().to_dict(outtype='records')
+        rows_ret = list()
+        for row in rows:
+            ret = dict((k, v) for k, v in row.iteritems() if notnull(v))
+            rows_ret.append(ret)
+        return rows_ret
         
     def _get_workbook_keys(self):
         '''

@@ -20,16 +20,15 @@ from dimagi_data_platform.utils import break_into_chunks
 logger = logging.getLogger(__name__)
 
 
-class StandardTableUpdater(object):
+class Loader(object):
     '''
-    updates a standard table from one or more incoming data tables produced by the importers
+    loads data into a standard table from one or more incoming data tables produced by the extracters
     '''
     _db_warehouse_table_class = None
     
     def __init__(self):
-        super(StandardTableUpdater, self).__init__()
+        super(Loader, self).__init__()
     
-    def update_table(self):
         pass
     
     def insert_chunked(self, l):
@@ -45,17 +44,17 @@ class StandardTableUpdater(object):
                 self._db_warehouse_table_class.insert_many(chunk).execute()
     
 
-class DomainTableUpdater(StandardTableUpdater):
+class DomainLoader(Loader):
     '''
-    updates the domain table, plus sectors and subsectors
+    loads data to the domain table, plus sectors and subsectors
     '''
     _db_warehouse_table_class = Domain
     _first_col_names_to_skip = ['Total', 'Mean', 'STD']
     
     def __init__(self):
-        super(DomainTableUpdater, self).__init__()
+        super(DomainLoader, self).__init__()
     
-    def update_table(self):
+    def do_load(self):
         
         for row in IncomingDomain.get_unimported():
             attrs = row.attributes
@@ -123,16 +122,16 @@ class DomainTableUpdater(StandardTableUpdater):
                 except Domain.DoesNotExist:
                     logger.warn('Domain referenced i domain annotations table with name %s, does not exist' % (dname))
                 
-class FormDefTableUpdater(StandardTableUpdater):
+class FormDefLoader(Loader):
     '''
-    updates the form definition table, plus subsectors
+    loads data to the form definition table, plus subsectors
     '''
     _db_warehouse_table_class = FormDefinition
     
     def __init__(self):
-        super(FormDefTableUpdater, self).__init__()
+        super(FormDefLoader, self).__init__()
     
-    def update_table(self):
+    def do_load(self):
         
         for row in IncomingFormAnnotation.get_unimported():
             attrs = row.attributes
@@ -178,9 +177,9 @@ class FormDefTableUpdater(StandardTableUpdater):
                     logger.warn('Domain with name %s does not exist, could not add Form Definition with xmlns %s and app ID %s' % (dname, xmlns, app_id))
 
 
-class UserTableUpdater(StandardTableUpdater):
+class UserLoader(Loader):
     '''
-    updates the user table from incoming forms and cases
+    loads data to the user table from incoming forms and cases
     '''
     
     _db_warehouse_table_class = User
@@ -191,10 +190,10 @@ class UserTableUpdater(StandardTableUpdater):
         Constructor
         '''
         self.domain = Domain.get(name=domain)
-        super(UserTableUpdater, self).__init__()
+        super(UserLoader, self).__init__()
         
-    def update_table(self):
-        logger.info('TIMESTAMP starting user table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+    def do_load(self):
+        logger.info('TIMESTAMP starting user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         
         case_users = IncomingCases.select(IncomingCases.user, IncomingCases.owner).where((IncomingCases.domain == self.domain.name) 
                                                                                          & ((IncomingCases.imported == False) | (IncomingCases.imported >> None)))
@@ -208,9 +207,9 @@ class UserTableUpdater(StandardTableUpdater):
         for user_id in user_ids_to_create:
             new_user = User.create(user=user_id, domain=self.domain)
 
-class CasesTableUpdater(StandardTableUpdater):
+class CasesLoader(Loader):
     '''
-    updates the case table from incoming cases
+    loads data to the case table from incoming cases
     '''
     
     _db_warehouse_table_class = Cases
@@ -220,10 +219,10 @@ class CasesTableUpdater(StandardTableUpdater):
         Constructor
         '''
         self.domain = Domain.get(name=domain)
-        super(CasesTableUpdater, self).__init__()
+        super(CasesLoader, self).__init__()
         
-    def update_table(self):
-        logger.info('TIMESTAMP starting cases table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+    def do_load(self):
+        logger.info('TIMESTAMP starting cases table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         inccases_q = IncomingCases.get_unimported(self.domain.name)
         logger.info('Incoming cases table has %d records not imported' % inccases_q.count())
         
@@ -263,9 +262,9 @@ class CasesTableUpdater(StandardTableUpdater):
             logger.info("inserting %d cases for domain %s" % (len(deduped), self.domain.name))
             self.insert_chunked(deduped)
 
-class FormTableUpdater(StandardTableUpdater):
+class FormLoader(Loader):
     '''
-    updates the form table from incoming forms
+    loads data to the form table from incoming forms
     '''
     
     _db_warehouse_table_class = Form
@@ -275,10 +274,10 @@ class FormTableUpdater(StandardTableUpdater):
         Constructor
         '''
         self.domain = Domain.get(name=domain)
-        super(FormTableUpdater, self).__init__()
+        super(FormLoader, self).__init__()
         
-    def update_table(self):
-        logger.info('TIMESTAMP starting form table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+    def do_load(self):
+        logger.info('TIMESTAMP starting form table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         incform_q = IncomingForm.get_unimported(self.domain.name)
         logger.info('Incoming form table has %d records not imported' % incform_q.count())
         
@@ -320,9 +319,9 @@ class FormTableUpdater(StandardTableUpdater):
             self.insert_chunked(deduped)
 
 
-class CaseEventTableUpdater(StandardTableUpdater):
+class CaseEventLoader(Loader):
     '''
-    updates the case event table from incoming forms
+    loads data to the case event table from incoming forms
     '''
     
     _db_warehouse_table_class = CaseEvent
@@ -332,10 +331,10 @@ class CaseEventTableUpdater(StandardTableUpdater):
         Constructor
         '''
         self.domain = Domain.get(name=domain)
-        super(CaseEventTableUpdater, self).__init__()
+        super(CaseEventLoader, self).__init__()
         
-    def update_table(self):
-        logger.info('TIMESTAMP starting case event table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+    def do_load(self):
+        logger.info('TIMESTAMP starting case event table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         ce_q = IncomingForm.select(IncomingForm.form, IncomingForm.case, IncomingForm.alt_case).where((IncomingForm.domain == self.domain.name) 
                                                                                                       & ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
         ce_pairs = set([(ce.form, ce.case if ce.case else ce.alt_case) for ce in ce_q.iterator()])
@@ -371,9 +370,9 @@ class CaseEventTableUpdater(StandardTableUpdater):
             logger.info("inserting %d case events for domain %s" % (len(insert_dicts), self.domain.name))
             self.insert_chunked(insert_dicts)
 
-class VisitTableUpdater(StandardTableUpdater):
+class VisitLoader(Loader):
     '''
-    updates the user table from form data
+    loads data to the visit table from form data
     '''
     
     _db_warehouse_table_class = Visit
@@ -383,7 +382,7 @@ class VisitTableUpdater(StandardTableUpdater):
         Constructor
         '''
         self.domain = Domain.get(name=domain)
-        super(VisitTableUpdater, self).__init__()
+        super(VisitLoader, self).__init__()
         
     def delete_most_recent(self, user):
         vq = Visit.select().where(Visit.user == user).order_by(Visit.time_start.desc()).limit(1)
@@ -407,8 +406,8 @@ class VisitTableUpdater(StandardTableUpdater):
 
         logger.debug('saved visit with id %d for user %s, %d forms' % (v.id, user.id, len(visited_forms)))
         
-    def update_table(self):
-        logger.info('TIMESTAMP starting visit table update for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+    def do_load(self):
+        logger.info('TIMESTAMP starting visit table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         users = User.select().where(User.domain == self.domain).order_by(User.user)
         
         # dict with case event ids as keys, case_ids as values

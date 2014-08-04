@@ -4,6 +4,7 @@ Created on Jul 1, 2014
 @author: mel
 '''
 import logging
+import subprocess
 
 from dimagi_data_platform.data_warehouse_db import Domain
 
@@ -30,6 +31,7 @@ def get_domains(domain_conf_json):
     returns names of domains to run on, specified by names or filters.
     named domains are always included in a run.
     filters are AND'd together - a domain is included only if it matches all filters
+    there is one special case. if the value of domains is the string "all", all domains are included.
     '''
     logger.info('processing domain conf sections: %s'% domain_conf_json)
     
@@ -90,3 +92,12 @@ def break_into_chunks(l, n):
     if n < 1:
         n = 1
     return [l[i:i + n] for i in range(0, len(l), n)]
+
+def run_proccess_and_log(cmd, args_list):
+    proc_list = [cmd] + args_list
+    proc = subprocess.Popen(proc_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = proc.communicate()
+    if stdout:
+        logger.info(stdout)
+    if stderr:
+        logger.error(stderr)

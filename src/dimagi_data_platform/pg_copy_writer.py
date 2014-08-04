@@ -102,6 +102,7 @@ class PgCopyWriter(SqlTableWriter):
         copy_sql = "COPY %s (%s) FROM STDIN DELIMITER ',' CSV HEADER" % (table['name'], headings)
         update_imported_sql = "UPDATE %s set imported=FALSE where imported is null" % table['name']
         
+        # need to use raw psycopg here to copy from stdin because with RDS not allowing admin users, can't copy from a file.
         raw_conn = engine.raw_connection()
         raw_cur = raw_conn.cursor()
         raw_cur.copy_expert(copy_sql, copy_file)

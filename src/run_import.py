@@ -6,34 +6,22 @@ Created on Jun 8, 2014
 import datetime
 import getpass
 import logging
-import os
-import subprocess
 
 from commcare_export.commcare_hq_client import CommCareHqClient
 
 from dimagi_data_platform import incoming_data_tables, data_warehouse_db, conf
 from dimagi_data_platform.data_warehouse_db import Domain
-from dimagi_data_platform.importers import ExcelImporter, \
-    CommCareExportCaseImporter, CommCareExportFormImporter
+from dimagi_data_platform.extracters import ExcelExtracter, \
+    CommCareExportCaseExtracter, CommCareExportFormExtracter
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \
     IncomingCases
-from dimagi_data_platform.standard_table_updaters import DomainTableUpdater, \
-    UserTableUpdater, FormTableUpdater, CasesTableUpdater, CaseEventTableUpdater, \
-    VisitTableUpdater, FormDefTableUpdater
+from dimagi_data_platform.loaders import DomainLoader, \
+    UserLoader, FormLoader, CasesLoader, CaseEventLoader, \
+    VisitLoader, FormDefLoader
 from dimagi_data_platform.utils import get_domains, configure_logger
 
-
 logger = logging.getLogger('dimagi_data_platform')
-
-def run_proccess_and_log(cmd, args_list):
-    proc_list = [cmd] + args_list
-    proc = subprocess.Popen(proc_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = proc.communicate()
-    if stdout:
-        logger.info(stdout)
-    if stderr:
-        logger.error(stderr)
         
 def setup():
     configure_logger(logger)
@@ -42,46 +30,45 @@ def setup():
     
 def update_platform_data():
     '''
-    update from master lists of domains, forms etc
+    update domains, form definitions, and anything else that is not extracted per-domain from APIs
     '''
     importers = []
-    importers.append(ExcelImporter(IncomingDomain, "domains.xlsx"))
-    importers.append(ExcelImporter(IncomingDomainAnnotation, "domain_annotations.xlsx"))
-    importers.append(ExcelImporter(IncomingFormAnnotation, "form_annotations.xlsx"))
+    importers.append(ExcelExtracter(IncomingDomain, "domains.xlsx"))
+    importers.append(ExcelExtracter(IncomingDomainAnnotation, "domain_annotations.xlsx"))
+    importers.append(ExcelExtracter(IncomingFormAnnotation, "form_annotations.xlsx"))
     
     for importer in importers:
-        importer.do_import()
+        importer.do_extract()
     
     table_updaters = []
-    table_updaters.append(DomainTableUpdater())
-    table_updaters.append(FormDefTableUpdater())
+    table_updaters.append(DomainLoader())
+    table_updaters.append(FormDefLoader())
         
     for table_updater in table_updaters:
-        table_updater.update_table()
+        table_updater.do_load()
         
     for importer in importers:
             importer.do_cleanup()
             
-def run_for_domains(domainlist, password):
-    
+def update_for_domains(domainlist, password):
+    '''
+    update per-domain data for domains in domainlist, using given HQ password and username specified in config_sys.json for API calls.
+    '''   
     for dname in domainlist:
         try:
             d = Domain.get(name=dname)
             since = d.last_hq_import
             
             importers = []
-            importers.append(CommCareExportCaseImporter(since, dname))
-            importers.append(CommCareExportFormImporter(since, dname))
-            
-            
-    
+            importers.append(CommCareExportCaseExtracter(since, dname))
+            importers.append(CommCareExportFormExtracter(since, dname))
+
             logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
-            
             api_client = CommCareHqClient('https://www.commcarehq.org', dname).authenticated(conf.CC_USER, password)
             
             for importer in importers:
                 importer.set_api_client(api_client)
-                importer.do_import()
+                importer.do_extract()
             
             d.last_hq_import = datetime.datetime.now()
             d.save()
@@ -89,18 +76,18 @@ def run_for_domains(domainlist, password):
             forms_to_import = IncomingForm.get_unimported(dname).count()
             cases_to_import = IncomingCases.get_unimported(dname).count()
             
-            if (forms_to_import > 0) or (cases_to_import >0):
+            if (forms_to_import > 0) or (cases_to_import > 0):
                 logger.info('We have %d forms and %d cases to import' % (forms_to_import, cases_to_import))
-                table_updaters = []
-                table_updaters.append(UserTableUpdater(dname))
-                table_updaters.append(FormTableUpdater(dname))
-                table_updaters.append(CasesTableUpdater(dname))
-                table_updaters.append(CaseEventTableUpdater(dname))
-                table_updaters.append(VisitTableUpdater(dname))
+                loaders = []
+                loaders.append(UserLoader(dname))
+                loaders.append(FormLoader(dname))
+                loaders.append(CasesLoader(dname))
+                loaders.append(CaseEventLoader(dname))
+                loaders.append(VisitLoader(dname))
                 
                 logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
-                for table_updater in table_updaters:
-                    table_updater.update_table()
+                for table_updater in loaders:
+                    table_updater.do_load()
                     
                 for importer in importers:
                     importer.do_cleanup()
@@ -112,7 +99,6 @@ def run_for_domains(domainlist, password):
                 logger.exception(e)
 
         
-
 def main():
         logger.info('TIMESTAMP starting run %s' % datetime.datetime.now())
         setup()
@@ -124,7 +110,7 @@ def main():
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
-        run_for_domains(domain_list, password)
+        update_for_domains(domain_list, password)
     
 if __name__ == '__main__':
     main()

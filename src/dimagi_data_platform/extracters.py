@@ -10,7 +10,7 @@ from commcare_export.commcare_minilinq import CommCareHqEnv
 from commcare_export.env import BuiltInEnv, JsonPathEnv
 from commcare_export.minilinq import Emit, Literal, Map, FlatMap, Reference, \
     Apply, List
-import numpy
+
 from pandas.core.common import notnull
 from pandas.io.excel import ExcelFile
 from playhouse.postgres_ext import HStoreField
@@ -24,7 +24,7 @@ from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 logger = logging.getLogger(__name__)
 
-class Importer(object):
+class Extracter(object):
     '''
     Knows how to read data from a source and write to incoming data tables.
     '''
@@ -66,15 +66,15 @@ class Importer(object):
         if hstorecols:
             return hstorecols[0]
         
-    def do_import(self):
+    def do_extract(self):
         pass
     
     def do_cleanup(self):
         pass
 
-class CommCareExportImporter(Importer):
+class CommCareExportExtracter(Extracter):
     '''
-    An importer that uses commcare-export
+    An extracter that uses commcare-export
     '''
 
     def __init__(self, incoming_table_class, since, domain):
@@ -85,7 +85,7 @@ class CommCareExportImporter(Importer):
         self.since = since
         self._incoming_table_class = incoming_table_class
         
-        super(CommCareExportImporter, self).__init__(self._incoming_table_class)
+        super(CommCareExportExtracter, self).__init__(self._incoming_table_class)
     
     @property
     def _get_query(self):
@@ -94,13 +94,13 @@ class CommCareExportImporter(Importer):
     def set_api_client(self, api_client):
         self.api_client = api_client
     
-    def do_import(self):
+    def do_extract(self):
         
         if not self.api_client:
-            raise Exception('CommCareExportImporter needs an initialized API client')
+            raise Exception('CommCareExportExtracter needs an initialized API client')
         
         if not self.engine:
-            raise Exception('CommCareExportImporter needs a database connection engine')
+            raise Exception('CommCareExportExtracter needs a database connection engine')
         
         writer = PgCopyWriter(self.engine.connect(), self.api_client.project)
         
@@ -122,9 +122,10 @@ class CommCareExportImporter(Importer):
         rows = update_q.execute()
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
             
-class CommCareExportFormImporter(CommCareExportImporter):
+class CommCareExportFormExtracter(CommCareExportExtracter):
     '''
-    An importer for cases
+    An extracter for forms using the CommCare Data APIs
+    https://confluence.dimagi.com/display/commcarepublic/Data+APIs
     '''
 
     _incoming_table_class = IncomingForm
@@ -133,7 +134,7 @@ class CommCareExportFormImporter(CommCareExportImporter):
         '''
         Constructor
         '''
-        super(CommCareExportFormImporter, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportFormExtracter, self).__init__(self._incoming_table_class, since, domain)
     
     @property
     def _get_query(self):
@@ -175,9 +176,10 @@ class CommCareExportFormImporter(CommCareExportImporter):
                               Apply(Reference('bool'), Reference('close')), ])))
         return form_query
     
-class CommCareExportCaseImporter(CommCareExportImporter):
+class CommCareExportCaseExtracter(CommCareExportExtracter):
     '''
-    An importer for cases
+    An extracter for cases using the CommCare Data APIs
+    https://confluence.dimagi.com/display/commcarepublic/Data+APIs
     '''
 
     _incoming_table_class = IncomingCases
@@ -186,7 +188,7 @@ class CommCareExportCaseImporter(CommCareExportImporter):
         '''
         Constructor
         '''  
-        super(CommCareExportCaseImporter, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportCaseExtracter, self).__init__(self._incoming_table_class, since, domain)
     
     @property
     def _get_query(self):
@@ -216,9 +218,9 @@ class CommCareExportCaseImporter(CommCareExportImporter):
                              Reference('indices.parent.case_id')])))
         return case_query
 
-class ExcelImporter(Importer):
+class ExcelExtracter(Extracter):
     '''
-    An importer for excel files. 
+    An extracter for excel files. 
     One sheet only for now. 
     Expects column names in first row, rest of rows mapped 1:1 to incoming table rows.
     Unique identifier (or unique for domain) in first column.
@@ -233,11 +235,11 @@ class ExcelImporter(Importer):
         
         self.workbook = ExcelFile(os.path.join(conf.INPUT_DIR, file_name))
         
-        super(ExcelImporter, self).__init__(self._incoming_table_class)
+        super(ExcelExtracter, self).__init__(self._incoming_table_class)
         
     def _get_workbook_rowdicts(self):
         '''
-        returns list of key-value dicts from keys in first row
+        returns list of key-value dicts for all rows in sheet, with keys in first row. empty values are removed.
         '''
         rows = self.workbook.parse().to_dict(outtype='records')
         rows_ret = list()
@@ -253,7 +255,7 @@ class ExcelImporter(Importer):
         return self.workbook.parse().to_dict().keys()
         
     
-    def do_import(self):
+    def do_extract(self):
         
         db_col_keys = [k for k in self._get_workbook_keys() if k in self._get_db_cols]
         hstore_keys = [h for h in self._get_workbook_keys() if h not in self._get_db_cols]

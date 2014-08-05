@@ -1,0 +1,20 @@
+{
+	"data_platform": 
+	{
+		"domains": 
+		{
+			"names": 
+			[
+				{
+					"name": "melissa-test-project"
+				},
+				{
+					"name": "another-project"
+				},
+				{
+					"name": "something-else"
+				}
+			]
+		}
+	}
+}

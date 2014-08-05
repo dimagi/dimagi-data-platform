@@ -1,0 +1,30 @@
+{
+	"data_platform": 
+	{
+		"database": 
+		{
+			"dbname": "mydb",
+			"host": "localhost",
+			"port": "5432",
+			"user": "myuser",
+			"pass": "mypass"
+		},
+
+		"directories": 
+		{
+			"input": "/path/to/input",
+			"tmp_files": "/path/to/input"
+		},
+
+		"s3": 
+		{
+			"output_url": "s3://bucket-id/output",
+			"input_url": "s3://bucket-id/input"
+		},
+
+		"commcare_export": 
+		{
+			"username": "commcare-username@email.com"
+		}
+	}
+}

@@ -11,7 +11,7 @@ from commcare_export.commcare_hq_client import CommCareHqClient
 
 from dimagi_data_platform import incoming_data_tables, data_warehouse_db, conf
 from dimagi_data_platform.data_warehouse_db import Domain
-from dimagi_data_platform.extracters import ExcelExtractor, \
+from dimagi_data_platform.extractors import ExcelExtractor, \
     CommCareExportCaseExtractor, CommCareExportFormExtractor
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \

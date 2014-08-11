@@ -24,7 +24,7 @@ from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 logger = logging.getLogger(__name__)
 
-class Extracter(object):
+class Extractor(object):
     '''
     Knows how to read data from a source and write to incoming data tables.
     '''
@@ -72,9 +72,9 @@ class Extracter(object):
     def do_cleanup(self):
         pass
 
-class CommCareExportExtracter(Extracter):
+class CommCareExportExtractor(Extractor):
     '''
-    An extracter that uses commcare-export
+    An extractor that uses commcare-export
     '''
 
     def __init__(self, incoming_table_class, since, domain):
@@ -85,7 +85,7 @@ class CommCareExportExtracter(Extracter):
         self.since = since
         self._incoming_table_class = incoming_table_class
         
-        super(CommCareExportExtracter, self).__init__(self._incoming_table_class)
+        super(CommCareExportExtractor, self).__init__(self._incoming_table_class)
     
     @property
     def _get_query(self):
@@ -97,10 +97,10 @@ class CommCareExportExtracter(Extracter):
     def do_extract(self):
         
         if not self.api_client:
-            raise Exception('CommCareExportExtracter needs an initialized API client')
+            raise Exception('CommCareExportExtractor needs an initialized API client')
         
         if not self.engine:
-            raise Exception('CommCareExportExtracter needs a database connection engine')
+            raise Exception('CommCareExportExtractor needs a database connection engine')
         
         writer = PgCopyWriter(self.engine.connect(), self.api_client.project)
         
@@ -122,9 +122,9 @@ class CommCareExportExtracter(Extracter):
         rows = update_q.execute()
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
             
-class CommCareExportFormExtracter(CommCareExportExtracter):
+class CommCareExportFormExtractor(CommCareExportExtractor):
     '''
-    An extracter for forms using the CommCare Data APIs
+    An extractor for forms using the CommCare Data APIs
     https://confluence.dimagi.com/display/commcarepublic/Data+APIs
     '''
 
@@ -134,7 +134,7 @@ class CommCareExportFormExtracter(CommCareExportExtracter):
         '''
         Constructor
         '''
-        super(CommCareExportFormExtracter, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, since, domain)
     
     @property
     def _get_query(self):
@@ -176,9 +176,9 @@ class CommCareExportFormExtracter(CommCareExportExtracter):
                               Apply(Reference('bool'), Reference('close')), ])))
         return form_query
     
-class CommCareExportCaseExtracter(CommCareExportExtracter):
+class CommCareExportCaseExtractor(CommCareExportExtractor):
     '''
-    An extracter for cases using the CommCare Data APIs
+    An extractor for cases using the CommCare Data APIs
     https://confluence.dimagi.com/display/commcarepublic/Data+APIs
     '''
 
@@ -188,7 +188,7 @@ class CommCareExportCaseExtracter(CommCareExportExtracter):
         '''
         Constructor
         '''  
-        super(CommCareExportCaseExtracter, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportCaseExtractor, self).__init__(self._incoming_table_class, since, domain)
     
     @property
     def _get_query(self):
@@ -218,9 +218,9 @@ class CommCareExportCaseExtracter(CommCareExportExtracter):
                              Reference('indices.parent.case_id')])))
         return case_query
 
-class ExcelExtracter(Extracter):
+class ExcelExtractor(Extractor):
     '''
-    An extracter for excel files. 
+    An extractor for excel files. 
     One sheet only for now. 
     Expects column names in first row, rest of rows mapped 1:1 to incoming table rows.
     Unique identifier (or unique for domain) in first column.
@@ -235,7 +235,7 @@ class ExcelExtracter(Extracter):
         
         self.workbook = ExcelFile(os.path.join(conf.INPUT_DIR, file_name))
         
-        super(ExcelExtracter, self).__init__(self._incoming_table_class)
+        super(ExcelExtractor, self).__init__(self._incoming_table_class)
         
     def _get_workbook_rowdicts(self):
         '''

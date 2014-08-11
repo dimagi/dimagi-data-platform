@@ -11,8 +11,8 @@ from commcare_export.commcare_hq_client import CommCareHqClient
 
 from dimagi_data_platform import incoming_data_tables, data_warehouse_db, conf
 from dimagi_data_platform.data_warehouse_db import Domain
-from dimagi_data_platform.extracters import ExcelExtracter, \
-    CommCareExportCaseExtracter, CommCareExportFormExtracter
+from dimagi_data_platform.extracters import ExcelExtractor, \
+    CommCareExportCaseExtractor, CommCareExportFormExtractor
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \
     IncomingCases
@@ -20,6 +20,7 @@ from dimagi_data_platform.loaders import DomainLoader, \
     UserLoader, FormLoader, CasesLoader, CaseEventLoader, \
     VisitLoader, FormDefLoader
 from dimagi_data_platform.utils import get_domains, configure_logger
+
 
 logger = logging.getLogger('dimagi_data_platform')
         
@@ -33,9 +34,9 @@ def update_platform_data():
     update domains, form definitions, and anything else that is not extracted per-domain from APIs
     '''
     importers = []
-    importers.append(ExcelExtracter(IncomingDomain, "domains.xlsx"))
-    importers.append(ExcelExtracter(IncomingDomainAnnotation, "domain_annotations.xlsx"))
-    importers.append(ExcelExtracter(IncomingFormAnnotation, "form_annotations.xlsx"))
+    importers.append(ExcelExtractor(IncomingDomain, "domains.xlsx"))
+    importers.append(ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx"))
+    importers.append(ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx"))
     
     for importer in importers:
         importer.do_extract()
@@ -60,8 +61,8 @@ def update_for_domains(domainlist, password):
             since = d.last_hq_import
             
             importers = []
-            importers.append(CommCareExportCaseExtracter(since, dname))
-            importers.append(CommCareExportFormExtracter(since, dname))
+            importers.append(CommCareExportCaseExtractor(since, dname))
+            importers.append(CommCareExportFormExtractor(since, dname))
 
             logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
             api_client = CommCareHqClient('https://www.commcarehq.org', dname).authenticated(conf.CC_USER, password)

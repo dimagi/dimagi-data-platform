@@ -10,7 +10,6 @@ from commcare_export.commcare_minilinq import CommCareHqEnv
 from commcare_export.env import BuiltInEnv, JsonPathEnv
 from commcare_export.minilinq import Emit, Literal, Map, FlatMap, Reference, \
     Apply, List
-
 from pandas.core.common import notnull
 from pandas.io.excel import ExcelFile
 from playhouse.postgres_ext import HStoreField

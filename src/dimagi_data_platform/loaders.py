@@ -10,7 +10,7 @@ from peewee import prefetch
 
 from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector, \
      User, Form, CaseEvent, Cases, FormDefinition, \
-    Subsector, FormDefinitionSubsector, Visit
+    Subsector, FormDefinitionSubsector, Visit, DomainSubsector
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm
@@ -53,74 +53,85 @@ class DomainLoader(Loader):
     
     def __init__(self):
         super(DomainLoader, self).__init__()
+        
+    def update_sectors(self, domain, sector_list, subsector_list):
+
+        dq_sec = DomainSector.delete().where(DomainSector.domain == domain)
+        dq_sec.execute()
+        
+        dq_subsec = DomainSubsector.delete().where(DomainSubsector.domain == domain)
+        dq_subsec.execute()
+        
+        for secname in sector_list:
+            try:
+                sec = Sector.get(name=secname)
+            except Sector.DoesNotExist:
+                sec = Sector(name=secname)
+                sec.save()
+            try:
+                ds = DomainSector.get(domain=domain, sector=sec)
+            except DomainSector.DoesNotExist:
+                ds = DomainSector(domain=domain, sector=sec)
+                ds.save()
+        
+        for subname in subsector_list:
+            try:
+                sub = Subsector.get(name=subname)
+            except Subsector.DoesNotExist:
+                sub = Subsector(name=subname)
+                sub.save()
+            try:
+                ds = DomainSubsector.get(domain=domain, subsector=sub)
+            except DomainSubsector.DoesNotExist:
+                ds = DomainSubsector(domain=domain, subsector=sub)
+                ds.save()
     
     def do_load(self):
         
-        for row in IncomingDomain.get_unimported():
+        hq_domain_list = IncomingDomain.get_unimported()
+        annotations = IncomingDomainAnnotation.get_unimported()
+        
+        for row in hq_domain_list:
             attrs = row.attributes
-            
             if not 'Project' in attrs:
                 logger.warn('Must have Project to save domain, but we only have  %s' % attrs)
             else:
                 dname = attrs['Project']
                 
-                if dname not in self._first_col_names_to_skip:
-                    try:
-                        domain = Domain.get(name=dname)
-                    except Domain.DoesNotExist:
-                        domain = Domain.create(name=dname)
-                    
-                    domain.organization = attrs['Organization'] if 'Organization' in attrs else None
-                    domain.country = attrs['Deployment Country'] if 'Deployment Country' in attrs else None
-                    domain.services = attrs['Services'] if 'Services' in attrs else None
-                    domain.project_state = attrs['Project State'] if 'Project State' in attrs else None
-                    domain.attributes = attrs
-                    
-                    domain.save()
-            
-        for row in IncomingDomainAnnotation.get_unimported():
-            
-            attrs = row.attributes
-            
-            if not 'Domain name' in attrs:
-                logger.warn('Must have Domain name to save domain annotations, but we only have  %s' % attrs)
-            else:
-                dname = attrs['Domain name']
-                business_unit = attrs['Business unit'] if 'Business unit' in attrs else None
-                sector_names_annotations = [k.replace('Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sector_') & (v == 'Yes'))]
+            if dname not in self._first_col_names_to_skip:
                 
-                sector_name_hq = [attrs["HQ_Sector"]] if "HQ_Sector" in attrs else []
-                sector_names=list()+sector_name_hq+sector_names_annotations
-                sector_names = [s for s in sector_names if (s is not None and not (s == ""))]
+                annotations = IncomingDomainAnnotation.select().where(IncomingDomainAnnotation.attributes.contains({'Domain name': dname}))
+                try:
+                    attrs.update(annotations.get().attributes)
+                except IncomingDomainAnnotation.DoesNotExist:
+                    pass
                 
                 try:
                     domain = Domain.get(name=dname)
-                    domain.business_unit = business_unit
-                    
-                    if domain.attributes:
-                        domain.attributes.update(attrs)
-                    else:
-                        domain.attributes = attrs
-                    
-                    
-                    dq = DomainSector.delete().where(DomainSector.domain == domain)
-                    dq.execute()
-                    
-                    for secname in sector_names:
-                        try:
-                            sec = Sector.get(name=secname)
-                        except Sector.DoesNotExist:
-                            sec = Sector(name=secname)
-                            sec.save()
-                        try:
-                            ds = DomainSector.get(domain=domain, sector=sec)
-                        except DomainSector.DoesNotExist:
-                            ds = DomainSector(domain=domain, sector=sec)
-                            ds.save()
-                    domain.save()
-
                 except Domain.DoesNotExist:
-                    logger.warn('Domain referenced i domain annotations table with name %s, does not exist' % (dname))
+                    domain = Domain.create(name=dname)
+                
+                domain.organization = attrs['Organization'] if 'Organization' in attrs else None
+                domain.country = attrs['Deployment Country'] if 'Deployment Country' in attrs else None
+                domain.services = attrs['Services'] if 'Services' in attrs else None
+                domain.project_state = attrs['Project State'] if 'Project State' in attrs else None
+                domain.business_unit = attrs['Business unit'] if 'Business unit' in attrs else None
+                domain.attributes = attrs
+                
+                sector_name_hq = [attrs["Sector"]] if "Sector" in attrs else None
+                sector_names_annotations = [k.replace('Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sector_') & (v == 'Yes'))]
+                sector_names = list() + sector_name_hq + sector_names_annotations
+                sector_names = [s for s in sector_names if (s is not None and not (s == "") and not (s == "No info"))]
+                
+                subsector_name_hq = [attrs["Sub-Sector"]] if "Sub-Sector" in attrs else None
+                subsector_names_annotations = [k.replace('Sub-Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sub-Sector_') & (v == 'Yes'))]
+                subsector_names = list() + subsector_name_hq + subsector_names_annotations
+                subsector_names = [sb for sb in subsector_names if (sb is not None and not (sb == "") and not (sb == "No info"))]
+                
+                self.update_sectors(domain, sector_names, subsector_names)
+                
+                domain.save()
+
                 
 class FormDefLoader(Loader):
     '''

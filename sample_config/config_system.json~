@@ -3,28 +3,28 @@
 	{
 		"database": 
 		{
-			"dbname": "data_platform_db",
+			"dbname": "mydb",
 			"host": "localhost",
 			"port": "5432",
-			"user": "importer",
-			"pass": "notthis"
+			"user": "myuser",
+			"pass": "mypass"
 		},
 
 		"directories": 
 		{
-			"input": "/datadrive/dimagi-data-platform/input",
-			"tmp_files": "/datadrive/dimagi-data-platform/tmp"
+			"input": "/path/to/input",
+			"tmp_files": "/path/to/input"
 		},
 
 		"s3": 
 		{
-			"output_url": "s3://dimagi-data-platform/output",
-			"input_url": "s3://dimagi-data-platform/input"
+			"output_url": "s3://bucket-id/output",
+			"input_url": "s3://bucket-id/input"
 		},
 
 		"commcare_export": 
 		{
-			"username": "mloudon@dimagi.com"
+			"username": "commcare-username@email.com"
 		}
 	}
 }

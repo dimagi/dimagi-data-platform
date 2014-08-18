@@ -8,11 +8,11 @@ import getpass
 import logging
 
 from commcare_export.commcare_hq_client import CommCareHqClient
-
 from dimagi_data_platform import incoming_data_tables, data_warehouse_db, conf
 from dimagi_data_platform.data_warehouse_db import Domain
 from dimagi_data_platform.extractors import ExcelExtractor, \
-    CommCareExportCaseExtractor, CommCareExportFormExtractor
+    CommCareExportCaseExtractor, CommCareExportFormExtractor, \
+    CommCareExportUserExtractor
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \
     IncomingCases
@@ -63,6 +63,7 @@ def update_for_domains(domainlist, password):
             importers = []
             importers.append(CommCareExportCaseExtractor(since, dname))
             importers.append(CommCareExportFormExtractor(since, dname))
+            importers.append(CommCareExportUserExtractor(since, dname))
 
             logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
             api_client = CommCareHqClient('https://www.commcarehq.org', dname).authenticated(conf.CC_USER, password)

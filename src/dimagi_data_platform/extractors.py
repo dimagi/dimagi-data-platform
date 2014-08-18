@@ -17,7 +17,7 @@ import sqlalchemy
 
 import conf
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
-    IncomingCases
+    IncomingCases, IncomingUsers
 from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 
@@ -216,6 +216,39 @@ class CommCareExportCaseExtractor(CommCareExportExtractor):
                              Reference('properties.owner_id'),
                              Reference('indices.parent.case_id')])))
         return case_query
+    
+class CommCareExportUserExtractor(CommCareExportExtractor):
+    '''
+    An extractor for cases using the CommCare Data APIs
+    https://confluence.dimagi.com/display/commcarepublic/Data+APIs
+    '''
+
+    _incoming_table_class = IncomingUsers
+    
+    def __init__(self, since, domain):
+        '''
+        Constructor
+        '''  
+        super(CommCareExportUserExtractor, self).__init__(self._incoming_table_class, since, domain)
+    
+    @property
+    def _get_query(self):
+        user_query = Emit(table=self._get_table_name,
+                   headings=[Literal('user_id'),
+                             Literal('username'),
+                             Literal('first_name'),
+                             Literal('last_name'),
+                             Literal('default_phone_number'),
+                             Literal('email')],
+                   source=Map(source=Apply(Reference('api_data'), Literal('user')),
+                              body=List([Reference('id'),
+                             Reference('username'),
+                             Reference('first_name'),
+                             Reference('last_name'),
+                             Reference('default_phone_number'),
+                             Reference('email'),
+                             Reference('user_id')])))
+        return user_query
 
 class ExcelExtractor(Extractor):
     '''

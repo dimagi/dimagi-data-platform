@@ -101,6 +101,18 @@ class IncomingForm(BaseDomainLinkedModel):
     class Meta:
         db_table = 'incoming_form'
 models.append(IncomingForm)
+
+class IncomingUsers(BaseDomainLinkedModel):
+    user_id = CharField(db_column='user_id', max_length=255, null=True)
+    username = CharField(db_column='username', max_length=255, null=True)
+    first_name = CharField(db_column='first_name', max_length=255, null=True)
+    last_name = CharField(db_column='last_name', max_length=255, null=True)
+    default_phone_number = CharField(db_column='default_phone_number', max_length=255, null=True)
+    email = CharField(db_column='email', max_length=255, null=True)
+    
+    class Meta:
+        db_table = 'incoming_users'
+models.append(IncomingUsers)
         
 def create_missing_tables():
     database.connect()

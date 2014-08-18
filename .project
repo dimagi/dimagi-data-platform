@@ -3,6 +3,7 @@
 	<name>dimagi-data-platform</name>
 	<comment></comment>
 	<projects>
+		<project>commcare-export</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

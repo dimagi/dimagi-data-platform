@@ -239,7 +239,9 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Literal('first_name'),
                              Literal('last_name'),
                              Literal('default_phone_number'),
-                             Literal('email')],
+                             Literal('email'),
+                             Literal('groups'),
+                             Literal('phone_numbers')],
                    source=Map(source=Apply(Reference('api_data'), Literal('user')),
                               body=List([Reference('id'),
                              Reference('username'),
@@ -247,7 +249,8 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Reference('last_name'),
                              Reference('default_phone_number'),
                              Reference('email'),
-                             Reference('user_id')])))
+                             Reference('groups'),
+                             Reference('phone_numbers')])))
         return user_query
 
 class ExcelExtractor(Extractor):

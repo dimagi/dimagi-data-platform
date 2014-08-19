@@ -115,6 +115,23 @@ class IncomingUsers(BaseDomainLinkedModel):
     class Meta:
         db_table = 'incoming_users'
 models.append(IncomingUsers)
+
+class IncomingDeviceLog(BaseDomainLinkedModel):
+    app_version = CharField(db_column='app_version', max_length=255, null=True)
+    log_date = CharField(db_column='log_date', max_length=255, null=True)
+    device_id = CharField(db_column='device_id', max_length=255, null=True)
+    i = IntegerField(db_column='i', null=True)
+    api_id = IntegerField(db_column='api_id', null=True)
+    msg = CharField(db_column='msg', null=True)
+    resource_uri= CharField(db_column='resource_uri',  null=True)
+    log_type = CharField(db_column='log_type', null=True)
+    user_id = CharField(db_column='user_id',  null=True)
+    username = CharField(db_column='username',  null=True)
+    xform_id = CharField(db_column='xform_id',  null=True)
+    
+    class Meta:
+        db_table = 'incoming_users'
+models.append(IncomingDeviceLog)
         
 def create_missing_tables():
     database.connect()

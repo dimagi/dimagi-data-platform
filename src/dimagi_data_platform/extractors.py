@@ -17,7 +17,7 @@ import sqlalchemy
 
 import conf
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
-    IncomingCases, IncomingUsers
+    IncomingCases, IncomingUsers, IncomingDeviceLog
 from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 
@@ -219,7 +219,7 @@ class CommCareExportCaseExtractor(CommCareExportExtractor):
     
 class CommCareExportUserExtractor(CommCareExportExtractor):
     '''
-    An extractor for cases using the CommCare Data APIs
+    An extractor for mobile user data using the CommCare Data APIs
     https://confluence.dimagi.com/display/commcarepublic/Data+APIs
     '''
 
@@ -251,6 +251,50 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Reference('email'),
                              Reference('groups'),
                              Reference('phone_numbers')])))
+        return user_query
+    
+class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
+    '''
+    An extractor for device logs using the CommCare Data APIs
+    https://confluence.dimagi.com/display/commcarepublic/Data+APIs
+    '''
+
+    _incoming_table_class = IncomingDeviceLog
+    
+    def __init__(self, since, domain):
+        '''
+        Constructor
+        '''  
+        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, since, domain)
+
+    @property
+    def _get_query(self):
+        user_query = Emit(table=self._get_table_name,
+                   headings=[Literal('app_version'),
+                             Literal('log_date'),
+                             Literal('device_id'),
+                             Literal('domain'),
+                             Literal('i'),
+                             Literal('api_id'),
+                             Literal('msg'),
+                             Literal('resource_uri'),
+                             Literal('log_type'),
+                             Literal('user_id'),
+                             Literal('username'),
+                             Literal('xform_id')],
+                   source=Map(source=Apply(Reference('api_data'), Literal('device-log')),
+                              body=List([Reference('app_version'),
+                             Reference('date'),
+                             Reference('device_id'),
+                             Reference('domain'),
+                             Reference('i'),
+                             Reference('id'),
+                             Reference('msg'),
+                             Reference('resource_uri'),
+                             Reference('type'),
+                             Reference('user_id'),
+                             Reference('username'),
+                             Reference('xform_id'),])))
         return user_query
 
 class ExcelExtractor(Extractor):

@@ -17,7 +17,7 @@ import sqlalchemy
 
 import conf
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
-    IncomingCases, IncomingUsers, IncomingDeviceLog
+    IncomingCases, IncomingUsers, IncomingDeviceLog, IncomingWebUser
 from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 
@@ -253,6 +253,46 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Reference('phone_numbers')])))
         return user_query
     
+class CommCareExportWebUserExtractor(CommCareExportExtractor):
+    '''
+    An extractor for web user data using the CommCare Data APIs
+    https://confluence.dimagi.com/display/commcarepublic/Data+APIs
+    '''
+
+    _incoming_table_class = IncomingWebUser
+    
+    def __init__(self, since, domain):
+        '''
+        Constructor
+        '''  
+        super(CommCareExportWebUserExtractor, self).__init__(self._incoming_table_class, since, domain)
+    
+    @property
+    def _get_query(self):
+        user_query = Emit(table=self._get_table_name,
+                   headings=[Literal('api_id'),
+                             Literal('username'),
+                             Literal('first_name'),
+                             Literal('last_name'),
+                             Literal('default_phone_number'),
+                             Literal('email'),
+                             Literal('phone_numbers'),
+                             Literal('is_admin'),
+                             Literal('resource_uri'),
+                             Literal('webuser_role')],
+                   source=Map(source=Apply(Reference('api_data'), Literal('web-user')),
+                              body=List([Reference('id'),
+                             Reference('username'),
+                             Reference('first_name'),
+                             Reference('last_name'),
+                             Reference('default_phone_number'),
+                             Reference('email'),
+                             Reference('phone_numbers'),
+                             Reference('is_admin'),
+                             Reference('resource_uri'),
+                             Reference('role')])))
+        return user_query
+    
 class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
     '''
     An extractor for device logs using the CommCare Data APIs
@@ -269,7 +309,7 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
 
     @property
     def _get_query(self):
-        user_query = Emit(table=self._get_table_name,
+        query = Emit(table=self._get_table_name,
                    headings=[Literal('app_version'),
                              Literal('log_date'),
                              Literal('device_id'),
@@ -295,7 +335,7 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
                              Reference('user_id'),
                              Reference('username'),
                              Reference('xform_id'),])))
-        return user_query
+        return query
 
 class ExcelExtractor(Extractor):
     '''

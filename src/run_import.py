@@ -14,7 +14,8 @@ from dimagi_data_platform.data_warehouse_db import Domain
 from dimagi_data_platform.extractors import ExcelExtractor, \
     CommCareExportCaseExtractor, CommCareExportFormExtractor, \
     CommCareExportUserExtractor, CommCareExportDeviceLogExtractor, \
-    CommCareExportWebUserExtractor
+    CommCareExportWebUserExtractor, \
+    CommCareSlumberFormDefExtractor, CommCareExportExtractor
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \
     IncomingCases
@@ -66,14 +67,18 @@ def update_for_domains(domainlist, password):
             importers.append(CommCareExportCaseExtractor(since, dname))
             importers.append(CommCareExportFormExtractor(since, dname))
             importers.append(CommCareExportUserExtractor(since, dname))
-            importers.append(CommCareExportWebUserExtractor(since, dname))
+            importers.append(CommCareExportWebUserExtractor(since, dname))    
+            importers.append(CommCareSlumberFormDefExtractor('v0.5', dname, conf.CC_USER, password))        
 
             logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
             api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(conf.CC_USER, password)
             
             for importer in importers:
-                importer.set_api_client(api_client)
+                if (isinstance(importer, CommCareExportExtractor)):
+                    importer.set_api_client(api_client)
                 importer.do_extract()
+                
+            
             
             d.last_hq_import = datetime.datetime.now()
             d.save()

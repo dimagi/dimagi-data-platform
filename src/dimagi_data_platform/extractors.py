@@ -3,6 +3,7 @@ Created on Jun 6, 2014
 
 @author: mel
 '''
+import json
 import logging
 import os
 
@@ -13,11 +14,14 @@ from commcare_export.minilinq import Emit, Literal, Map, FlatMap, Reference, \
 from pandas.core.common import notnull
 from pandas.io.excel import ExcelFile
 from playhouse.postgres_ext import HStoreField
+from requests.auth import HTTPDigestAuth
+import slumber
 import sqlalchemy
 
 import conf
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
-    IncomingCases, IncomingUsers, IncomingDeviceLog, IncomingWebUser
+    IncomingCases, IncomingUsers, IncomingDeviceLog, IncomingWebUser, \
+    IncomingFormDef
 from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 
@@ -241,7 +245,9 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Literal('default_phone_number'),
                              Literal('email'),
                              Literal('groups'),
-                             Literal('phone_numbers')],
+                             Literal('phone_numbers'),
+                             Literal('user_data'),
+                             Literal('domain')],
                    source=Map(source=Apply(Reference('api_data'), Literal('user')),
                               body=List([Reference('id'),
                              Reference('username'),
@@ -250,7 +256,9 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Reference('default_phone_number'),
                              Reference('email'),
                              Reference('groups'),
-                             Reference('phone_numbers')])))
+                             Reference('phone_numbers'),
+                             Reference('user_data'),
+                             Literal(self.domain)])))
         return user_query
     
 class CommCareExportWebUserExtractor(CommCareExportExtractor):
@@ -279,18 +287,20 @@ class CommCareExportWebUserExtractor(CommCareExportExtractor):
                              Literal('phone_numbers'),
                              Literal('is_admin'),
                              Literal('resource_uri'),
-                             Literal('webuser_role')],
+                             Literal('webuser_role'),
+                             Literal('domain')],
                    source=Map(source=Apply(Reference('api_data'), Literal('web-user')),
                               body=List([Reference('id'),
-                             Reference('username'),
-                             Reference('first_name'),
-                             Reference('last_name'),
-                             Reference('default_phone_number'),
-                             Reference('email'),
-                             Reference('phone_numbers'),
-                             Reference('is_admin'),
-                             Reference('resource_uri'),
-                             Reference('role')])))
+                                         Reference('username'),
+                                         Reference('first_name'),
+                                         Reference('last_name'),
+                                         Reference('default_phone_number'),
+                                         Reference('email'),
+                                         Reference('phone_numbers'),
+                                         Reference('is_admin'),
+                                         Reference('resource_uri'),
+                                         Reference('role'),
+                                         Literal(self.domain)])))
         return user_query
     
 class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
@@ -326,7 +336,7 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
                               body=List([Reference('app_version'),
                              Reference('date'),
                              Reference('device_id'),
-                             Reference('domain'),
+                             Literal(self.domain),
                              Reference('i'),
                              Reference('id'),
                              Reference('msg'),
@@ -334,8 +344,54 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
                              Reference('type'),
                              Reference('user_id'),
                              Reference('username'),
-                             Reference('xform_id'),])))
+                             Reference('xform_id'), ])))
         return query
+    
+class CommCareSlumberFormDefExtractor(Extractor):
+    '''
+    An extractor for application structure data using the CommCare Data APIs
+    https://confluence.dimagi.com/display/commcarepublic/Data+APIs
+    This one doesn't use commcare-export. I couldn't figure out the jsonpath.
+    '''
+
+    _incoming_table_class = IncomingFormDef
+    
+    def __init__(self, api_version, domain, username, password):
+        '''
+        Constructor
+        '''
+        self.domain=domain
+        url = "https://www.commcarehq.org/a/%s/api/%s/" % (domain,api_version)
+        self.api = slumber.API(url, auth=HTTPDigestAuth(username, password))
+        super(CommCareSlumberFormDefExtractor, self).__init__(self._incoming_table_class)
+        
+    def __save_formdefs(self, app_objects):
+        for app in app_objects:
+            for mod in app['modules']:
+                for form in mod['forms']:
+                    names = ','.join(['"%s"'%n for n in form["name"].values()])
+                    
+                    fd = IncomingFormDef(app_id=app["id"], app_name=app["name"], domain=self.domain, case_type=mod["case_type"],form_names=names, form_xmlns = form["xmlns"])
+                    fd.formdef_json = json.dumps(form, ensure_ascii=False)
+                    fd.save()
+
+    def do_extract(self):
+        app_data = self.api.application.get()
+        next_page = app_data['meta']['next']
+        app_objects = app_data['objects']
+        
+        while next_page:
+            app_data = self.api.application.get(offset=app_data['meta']['offset'] + app_data['meta']['limit'] , limit = app_data['meta']['limit'])
+            next_page = app_data['meta']['next']
+            app_objects.extend(app_data['objects'])
+            
+        self.__save_formdefs(app_objects)
+        
+    def do_cleanup(self):
+        update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.domain == self.domain) 
+                                                                          & ((self._incoming_table_class.imported == False) | (self._incoming_table_class.imported >> None)))
+        rows = update_q.execute()
+        logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
 
 class ExcelExtractor(Extractor):
     '''

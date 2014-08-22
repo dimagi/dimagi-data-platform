@@ -9,9 +9,10 @@ import logging
 from peewee import  Model, CharField, DateTimeField, \
     ForeignKeyField, IntegerField, BooleanField, PrimaryKeyField, \
     drop_model_tables
-from playhouse.postgres_ext import HStoreField
+from playhouse.postgres_ext import HStoreField, ArrayField, JSONField
 
 from dimagi_data_platform import conf
+
 
 logger = logging.getLogger('peewee')
 
@@ -81,6 +82,10 @@ class FormDefinition(BaseModel):
     xmlns = CharField(max_length=255, null=True)
     app_id = CharField(max_length=255, null=True)
     
+    app_name = CharField(db_column='app_name', max_length=255, null=True)
+    form_names = HStoreField(db_column='form_names', null=True)
+    formdef_json = JSONField(db_column='formdef_json', null=True)
+    
     attributes = HStoreField(null=True)
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='formdefs')
     sector = ForeignKeyField(db_column='sector_id',  rel_model=Sector, related_name='formdefs', null=True)
@@ -102,10 +107,36 @@ class User(BaseModel):
     id = PrimaryKeyField(db_column='id')
     user = CharField(db_column='user_id', max_length=255, null=True)
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='users')
+    
+    username = CharField(db_column='username', max_length=255, null=True)
+    first_name = CharField(db_column='first_name', max_length=255, null=True)
+    last_name = CharField(db_column='last_name', max_length=255, null=True)
+    default_phone_number = CharField(db_column='default_phone_number', max_length=255, null=True)
+    email = CharField(db_column='email', max_length=255, null=True)
+    groups = ArrayField(CharField,null=True)
+    phone_numbers= ArrayField(CharField,null=True)
 
     class Meta:
         db_table = 'users'
 models.append(User)
+
+class WebUser(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    user = CharField(db_column='user_id', max_length=255, null=True)
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='webusers')
+    username = CharField(db_column='username', max_length=255, null=True)
+    first_name = CharField(db_column='first_name', max_length=255, null=True)
+    last_name = CharField(db_column='last_name', max_length=255, null=True)
+    default_phone_number = CharField(db_column='default_phone_number', max_length=255, null=True)
+    email = CharField(db_column='email', max_length=255, null=True)
+    is_admin = BooleanField(db_column='is_admin', null=True)
+    resource_uri = CharField(db_column='resource_uri', null=True)
+    webuser_role = CharField(db_column='webuser_role',max_length=255, null=True)
+    phone_numbers= ArrayField(CharField,null=True)
+
+    class Meta:
+        db_table = 'web_user'
+models.append(WebUser)
 
 class Visit(BaseModel):
     id = PrimaryKeyField(db_column='id')
@@ -167,6 +198,26 @@ class CaseEvent(BaseModel):
     class Meta:
         db_table = 'case_event'
 models.append(CaseEvent)
+
+class DeviceLog(BaseModel):
+    app_version = CharField(db_column='app_version', max_length=255, null=True)
+    log_date = DateTimeField(db_column='log_date', null=True)
+    device_id = CharField(db_column='device_id', max_length=255, null=True)
+    i = IntegerField(db_column='i', null=True)
+    api_id = IntegerField(db_column='api_id', null=True)
+    msg = CharField(db_column='msg', null=True)
+    resource_uri= CharField(db_column='resource_uri',  null=True)
+    log_type = CharField(db_column='log_type', null=True)
+    form = CharField(db_column='form_id', max_length=255, null=True)
+    
+    user = ForeignKeyField(db_column='user_id',  null=True, rel_model=User, related_name='devicelogs')
+    
+    '''decided to keep form fk out of the log table for now because it's so big'''
+    #form = ForeignKeyField(db_column='form_id',  null=True, rel_model=Form, related_name='devicelogs')
+    
+    class Meta:
+        db_table = 'device_log'
+models.append(DeviceLog)
 
 
 def create_missing_tables():

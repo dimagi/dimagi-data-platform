@@ -102,7 +102,7 @@ class IncomingForm(BaseDomainLinkedModel):
         db_table = 'incoming_form'
 models.append(IncomingForm)
 
-class IncomingUsers(BaseDomainLinkedModel):
+class IncomingUser(BaseDomainLinkedModel):
     user_id = CharField(db_column='user_id', max_length=255, null=True)
     username = CharField(db_column='username', max_length=255, null=True)
     first_name = CharField(db_column='first_name', max_length=255, null=True)
@@ -115,7 +115,7 @@ class IncomingUsers(BaseDomainLinkedModel):
     
     class Meta:
         db_table = 'incoming_users'
-models.append(IncomingUsers)
+models.append(IncomingUser)
 
 class IncomingDeviceLog(BaseDomainLinkedModel):
     app_version = CharField(db_column='app_version', max_length=255, null=True)
@@ -131,7 +131,7 @@ class IncomingDeviceLog(BaseDomainLinkedModel):
     xform_id = CharField(db_column='xform_id',  null=True)
     
     class Meta:
-        db_table = 'incoming_users'
+        db_table = 'incoming_device_log'
 models.append(IncomingDeviceLog)
 
 class IncomingWebUser(BaseDomainLinkedModel):
@@ -153,7 +153,7 @@ models.append(IncomingWebUser)
 class IncomingFormDef(BaseDomainLinkedModel):
     app_id = CharField(db_column='app_id', max_length=255, null=True)
     app_name = CharField(db_column='app_name', max_length=255, null=True)
-    form_names = CharField(db_column='form_name_en', null=True)
+    form_names = CharField(db_column='form_names', null=True)
     form_xmlns = CharField(db_column='form_xmlns', max_length=255, null=True)
     formdef_json = TextField(db_column='formdef_json', null=True)
 

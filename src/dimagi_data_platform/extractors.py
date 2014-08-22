@@ -20,7 +20,7 @@ import sqlalchemy
 
 import conf
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
-    IncomingCases, IncomingUsers, IncomingDeviceLog, IncomingWebUser, \
+    IncomingCases, IncomingUser, IncomingDeviceLog, IncomingWebUser, \
     IncomingFormDef
 from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
@@ -227,7 +227,7 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
     https://confluence.dimagi.com/display/commcarepublic/Data+APIs
     '''
 
-    _incoming_table_class = IncomingUsers
+    _incoming_table_class = IncomingUser
     
     def __init__(self, since, domain):
         '''
@@ -369,7 +369,7 @@ class CommCareSlumberFormDefExtractor(Extractor):
         for app in app_objects:
             for mod in app['modules']:
                 for form in mod['forms']:
-                    names = ','.join(['"%s"'%n for n in form["name"].values()])
+                    names = json.dumps(form['name'])
                     
                     fd = IncomingFormDef(app_id=app["id"], app_name=app["name"], domain=self.domain, case_type=mod["case_type"],form_names=names, form_xmlns = form["xmlns"])
                     fd.formdef_json = json.dumps(form, ensure_ascii=False)

@@ -21,7 +21,7 @@ from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingCases
 from dimagi_data_platform.loaders import DomainLoader, \
     UserLoader, FormLoader, CasesLoader, CaseEventLoader, \
-    VisitLoader, FormDefLoader
+    VisitLoader, FormDefLoader, WebUserLoader
 from dimagi_data_platform.utils import get_domains, configure_logger
 
 
@@ -46,7 +46,6 @@ def update_platform_data():
     
     table_updaters = []
     table_updaters.append(DomainLoader())
-    table_updaters.append(FormDefLoader())
         
     for table_updater in table_updaters:
         table_updater.do_load()
@@ -94,6 +93,8 @@ def update_for_domains(domainlist, password):
                 loaders.append(CasesLoader(dname))
                 loaders.append(CaseEventLoader(dname))
                 loaders.append(VisitLoader(dname))
+                loaders.append(FormDefLoader(dname))
+                loaders.append(WebUserLoader(dname))
                 
                 logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
                 for table_updater in loaders:

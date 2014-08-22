@@ -4,16 +4,19 @@ Created on Jun 17, 2014
 @author: mel
 '''
 import datetime
+import json
 import logging
 
 from peewee import prefetch
 
 from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector, \
      User, Form, CaseEvent, Cases, FormDefinition, \
-    Subsector, FormDefinitionSubsector, Visit, DomainSubsector
+    Subsector, FormDefinitionSubsector, Visit, DomainSubsector, WebUser, \
+    DeviceLog
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
-    IncomingForm
+    IncomingForm, IncomingFormDef, IncomingUser, IncomingWebUser, \
+    IncomingDeviceLog
 from dimagi_data_platform.utils import break_into_chunks
 
 
@@ -100,7 +103,7 @@ class DomainLoader(Loader):
                 
             if dname not in self._first_col_names_to_skip:
                 
-                annotations = IncomingDomainAnnotation.select().where(IncomingDomainAnnotation.attributes.contains({'Domain name': dname}))
+                annotations = annotations.select().where(IncomingDomainAnnotation.attributes.contains({'Domain name': dname}))
                 try:
                     attrs.update(annotations.get().attributes)
                 except IncomingDomainAnnotation.DoesNotExist:
@@ -139,12 +142,12 @@ class FormDefLoader(Loader):
     '''
     _db_warehouse_table_class = FormDefinition
     
-    def __init__(self):
+    def __init__(self, domain):
+        self.domain = Domain.get(name=domain)
         super(FormDefLoader, self).__init__()
-    
-    def do_load(self):
         
-        for row in IncomingFormAnnotation.get_unimported():
+    def load_from_annotations(self):
+        for row in IncomingFormAnnotation.get_unimported().select().where(IncomingDomainAnnotation.attributes.contains({'Domain name': self.domain.name})):
             attrs = row.attributes
             
             if not ('Form xmlns' in attrs and 'Application ID' in attrs and 'Domain name' in attrs):
@@ -158,7 +161,6 @@ class FormDefLoader(Loader):
                 
                 try:
                     domain = Domain.get(name=dname)
-                    
                     try:
                         fd = FormDefinition.get(xmlns=xmlns, app_id=app_id, domain=domain)
                     except FormDefinition.DoesNotExist:
@@ -187,15 +189,80 @@ class FormDefLoader(Loader):
                 except Domain.DoesNotExist:
                     logger.warn('Domain with name %s does not exist, could not add Form Definition with xmlns %s and app ID %s' % (dname, xmlns, app_id))
 
+        
+    def load_from_API(self):
+        for inc in IncomingFormDef.get_unimported(self.domain.name):
+            try:
+                domain = Domain.get(name=inc.domain)
+            except Domain.DoesNotExist:
+                logger.warn('Domain with name %s does not exist, could not add Form Definition ' % (domain))
+                continue
+
+            try:
+                fd = FormDefinition.get(xmlns=inc.form_xmlns, app_id=inc.app_id, domain=domain)
+            except FormDefinition.DoesNotExist:
+                fd = FormDefinition(xmlns=inc.form_xmlns, app_id=inc.app_id, domain=domain)
+                
+            fd.app_name = inc.app_name
+            fd.form_names = json.loads(inc.form_names) if inc.form_names else None
+            fd.formdef_json = json.loads(inc.formdef_json)
+            
+            fd.save()
+    
+    def do_load(self):
+        self.load_from_API()
+        self.load_from_annotations()
+        
+class WebUserLoader(Loader):
+    '''
+    loads data to the user table from the web-user API (incoming web users)
+    '''
+    
+    _db_warehouse_table_class = WebUser
+    
+    def __init__(self, domain):
+        '''
+        Constructor
+        '''
+        self.domain = Domain.get(name=domain)
+        super(WebUserLoader, self).__init__()
+    
+    def load_from_API(self):
+        for inc in IncomingWebUser.get_unimported(self.domain.name):
+            try:
+                domain = Domain.get(name=inc.domain)
+            except Domain.DoesNotExist:
+                logger.warn('Domain with name %s does not exist, could not add Web User ' % (domain))
+                continue
+            try:
+                u = WebUser.get(user=inc.api_id, domain=domain)
+            except WebUser.DoesNotExist:
+                u = WebUser(user=inc.api_id, domain=domain)
+                
+            u.username = inc.username
+            u.first_name = inc.first_name
+            u.last_name = inc.last_name
+            u.default_phone_number = inc.default_phone_number
+            u.email = inc.email
+            u.phone_numbers = inc.phone_numbers.split(',') if inc.phone_numbers else None
+            u.is_admin = inc.is_admin
+            u.resource_uri = inc.resource_uri
+            u.webuser_role = inc. webuser_role
+            
+            u.save()
+            
+    def do_load(self):
+        logger.info('TIMESTAMP starting web user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+        self.load_from_API()
+            
 
 class UserLoader(Loader):
     '''
-    loads data to the user table from incoming forms and cases
+    loads data to the user table from the user API (incoming users) and then add any extra userids from incoming forms and cases
     '''
     
     _db_warehouse_table_class = User
     
-
     def __init__(self, domain):
         '''
         Constructor
@@ -203,9 +270,7 @@ class UserLoader(Loader):
         self.domain = Domain.get(name=domain)
         super(UserLoader, self).__init__()
         
-    def do_load(self):
-        logger.info('TIMESTAMP starting user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
-        
+    def load_from_forms_and_cases(self):
         case_users = IncomingCases.select(IncomingCases.user, IncomingCases.owner).where((IncomingCases.domain == self.domain.name) 
                                                                                          & ((IncomingCases.imported == False) | (IncomingCases.imported >> None)))
         
@@ -217,6 +282,35 @@ class UserLoader(Loader):
         
         for user_id in user_ids_to_create:
             new_user = User.create(user=user_id, domain=self.domain)
+    
+    def load_from_API(self):
+        for inc in IncomingUser.get_unimported(self.domain.name):
+            try:
+                domain = Domain.get(name=inc.domain)
+            except Domain.DoesNotExist:
+                logger.warn('Domain with name %s does not exist, could not add User ' % (domain))
+                continue
+            try:
+                u = User.get(user=inc.user_id, domain=domain)
+            except User.DoesNotExist:
+                u = User(user=inc.user_id, domain=domain)
+                
+            u.username = inc.username
+            u.first_name = inc.first_name
+            u.last_name = inc.last_name
+            u.default_phone_number = inc.default_phone_number
+            u.email = inc.email
+            u.groups = inc.groups.split(',') if inc.groups else None
+            u.phone_numbers = inc.phone_numbers.split(',') if inc.phone_numbers else None
+            
+            u.save()
+            
+    def do_load(self):
+        logger.info('TIMESTAMP starting user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+        self.load_from_API()
+        self.load_from_forms_and_cases()
+        
+        
 
 class CasesLoader(Loader):
     '''
@@ -475,4 +569,50 @@ class VisitLoader(Loader):
             
             # save the last visit for this user
             if prev_visited_forms:
-                previous_visit = self.create_visit(usr, prev_visited_forms)      
+                previous_visit = self.create_visit(usr, prev_visited_forms)
+                
+class DeviceLogLoader(Loader):
+    '''
+    loads data to the user table from the web-user API (incoming web users)
+    '''
+    
+    _db_warehouse_table_class = DeviceLog
+    
+    def __init__(self, domain):
+        '''
+        Constructor
+        '''
+        self.domain = Domain.get(name=domain)
+        super(DeviceLogLoader, self).__init__()
+    
+    def load_from_API(self):
+        insert_dicts = []
+        user_id_q = self.domain.users.select()
+        user_id_dict = dict([(u.user, u.id) for u in user_id_q])
+        
+        for inc in IncomingDeviceLog.get_unimported(self.domain.name).iterator():
+            try:
+                domain = Domain.get(name=inc.domain)
+            except Domain.DoesNotExist:
+                logger.warn('Domain with name %s does not exist, could not add Device Log ' % (domain))
+                continue
+            try:
+                dev = DeviceLog.get(api_id=inc.api_id, domain=domain)
+            except DeviceLog.DoesNotExist:
+                log_date = datetime.datetime.strptime(inc.log_date, '%Y-%m-%dT%H:%M:%S') if inc.log_date else None
+                user_id = user_id_dict[inc.user_id] if inc.user_id else none
+                row = {'api_id':inc.api_id, 'domain':self.domain.id,'app_version':inc.app_version,
+                       'log_date':log_date,'device_id':inc.device_id, 'form':inc.xform_id,
+                       'i':inc.i,'msg':inc.msg, 'resource_uri':inc.resource_uri,'log_type':inc.log_type, 'user_id':user_id}
+                insert_dicts.append(row)
+    
+            if insert_dicts:
+                logger.info("inserting %d device log entries for domain %s" % (len(insert_dicts), self.domain.name))
+                self.insert_chunked(insert_dicts)
+                
+
+            
+    def do_load(self):
+        logger.info('TIMESTAMP starting web user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+        self.load_from_API()
+            

@@ -18,10 +18,10 @@ from dimagi_data_platform.extractors import ExcelExtractor, \
     CommCareSlumberFormDefExtractor, CommCareExportExtractor
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \
-    IncomingCases
+    IncomingCases, IncomingDeviceLog
 from dimagi_data_platform.loaders import DomainLoader, \
     UserLoader, FormLoader, CasesLoader, CaseEventLoader, \
-    VisitLoader, FormDefLoader, WebUserLoader
+    VisitLoader, FormDefLoader, WebUserLoader, DeviceLogLoader
 from dimagi_data_platform.utils import get_domains, configure_logger
 
 
@@ -66,7 +66,8 @@ def update_for_domains(domainlist, password):
             importers.append(CommCareExportCaseExtractor(since, dname))
             importers.append(CommCareExportFormExtractor(since, dname))
             importers.append(CommCareExportUserExtractor(since, dname))
-            importers.append(CommCareExportWebUserExtractor(since, dname))    
+            importers.append(CommCareExportWebUserExtractor(since, dname))
+            importers.append(CommCareExportDeviceLogExtractor(since, dname))   
             importers.append(CommCareSlumberFormDefExtractor('v0.5', dname, conf.CC_USER, password))        
 
             logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
@@ -84,8 +85,9 @@ def update_for_domains(domainlist, password):
             
             forms_to_import = IncomingForm.get_unimported(dname).count()
             cases_to_import = IncomingCases.get_unimported(dname).count()
+            device_logs_to_import = IncomingDeviceLog.get_unimported(dname).count()
             
-            if (forms_to_import > 0) or (cases_to_import > 0):
+            if (forms_to_import > 0) or (cases_to_import > 0) or (device_logs_to_import > 0):
                 logger.info('We have %d forms and %d cases to import' % (forms_to_import, cases_to_import))
                 loaders = []
                 loaders.append(UserLoader(dname))
@@ -93,15 +95,18 @@ def update_for_domains(domainlist, password):
                 loaders.append(CasesLoader(dname))
                 loaders.append(CaseEventLoader(dname))
                 loaders.append(VisitLoader(dname))
-                loaders.append(FormDefLoader(dname))
-                loaders.append(WebUserLoader(dname))
+                loaders.append(DeviceLogLoader(dname))
+            
+            loaders.append(FormDefLoader(dname))
+            loaders.append(WebUserLoader(dname))
                 
-                logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
-                for table_updater in loaders:
-                    table_updater.do_load()
-                    
-                for importer in importers:
-                    importer.do_cleanup()
+            logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
+            
+            for table_updater in loaders:
+                table_updater.do_load()
+                
+            for importer in importers:
+                importer.do_cleanup()
             else:
                 logger.info('No forms or cases to import for domain %s' % (d.name))
                 

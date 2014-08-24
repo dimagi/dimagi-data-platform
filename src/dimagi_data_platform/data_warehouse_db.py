@@ -8,7 +8,7 @@ import logging
 
 from peewee import  Model, CharField, DateTimeField, \
     ForeignKeyField, IntegerField, BooleanField, PrimaryKeyField, \
-    drop_model_tables
+    drop_model_tables, TextField
 from playhouse.postgres_ext import HStoreField, ArrayField, JSONField
 
 from dimagi_data_platform import conf
@@ -205,12 +205,14 @@ class DeviceLog(BaseModel):
     device_id = CharField(db_column='device_id', max_length=255, null=True)
     i = IntegerField(db_column='i', null=True)
     api_id = IntegerField(db_column='api_id', null=True)
-    msg = CharField(db_column='msg', null=True)
+    msg = TextField(db_column='msg', null=True)
     resource_uri= CharField(db_column='resource_uri',  null=True)
     log_type = CharField(db_column='log_type', null=True)
     form = CharField(db_column='form_id', max_length=255, null=True)
     
-    user = ForeignKeyField(db_column='user_id',  null=True, rel_model=User, related_name='devicelogs')
+    user = ForeignKeyField(db_column='user_id',  null=True, rel_model=User, related_name='device_logs')
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='device_logs')
+    
     
     '''decided to keep form fk out of the log table for now because it's so big'''
     #form = ForeignKeyField(db_column='form_id',  null=True, rel_model=Form, related_name='devicelogs')

@@ -590,7 +590,10 @@ class DeviceLogLoader(Loader):
         user_id_q = self.domain.users.select()
         user_id_dict = dict([(u.user, u.id) for u in user_id_q])
         
-        for inc in IncomingDeviceLog.get_unimported(self.domain.name).iterator():
+        unimported_logs = IncomingDeviceLog.get_unimported(self.domain.name)
+        logger.info('Incoming device log table has %d records not imported' % unimported_logs.count())
+        
+        for inc in unimported_logs.iterator():
             try:
                 domain = Domain.get(name=inc.domain)
             except Domain.DoesNotExist:
@@ -600,19 +603,27 @@ class DeviceLogLoader(Loader):
                 dev = DeviceLog.get(api_id=inc.api_id, domain=domain)
             except DeviceLog.DoesNotExist:
                 log_date = datetime.datetime.strptime(inc.log_date, '%Y-%m-%dT%H:%M:%S') if inc.log_date else None
-                user_id = user_id_dict[inc.user_id] if inc.user_id else none
+                
+                if (inc.user_id):
+                    if inc.user_id in user_id_dict:
+                        user_id = user_id_dict[inc.user_id]
+                    else:
+                        user_id = User.create(user=inc.user_id)
+                else:
+                    user_id=None
+                        
                 row = {'api_id':inc.api_id, 'domain':self.domain.id,'app_version':inc.app_version,
                        'log_date':log_date,'device_id':inc.device_id, 'form':inc.xform_id,
-                       'i':inc.i,'msg':inc.msg, 'resource_uri':inc.resource_uri,'log_type':inc.log_type, 'user_id':user_id}
+                       'i':inc.i,'msg':inc.msg, 'resource_uri':inc.resource_uri,'log_type':inc.log_type, 'user':user_id}
                 insert_dicts.append(row)
     
-            if insert_dicts:
-                logger.info("inserting %d device log entries for domain %s" % (len(insert_dicts), self.domain.name))
-                self.insert_chunked(insert_dicts)
+        if insert_dicts:
+            logger.info("inserting %d device log entries for domain %s" % (len(insert_dicts), self.domain.name))
+            self.insert_chunked(insert_dicts)
                 
 
             
     def do_load(self):
-        logger.info('TIMESTAMP starting web user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+        logger.info('TIMESTAMP starting device log table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         self.load_from_API()
             

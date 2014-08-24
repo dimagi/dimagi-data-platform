@@ -123,7 +123,7 @@ class IncomingDeviceLog(BaseDomainLinkedModel):
     device_id = CharField(db_column='device_id', max_length=255, null=True)
     i = IntegerField(db_column='i', null=True)
     api_id = IntegerField(db_column='api_id', null=True)
-    msg = CharField(db_column='msg', null=True)
+    msg = TextField(db_column='msg', null=True)
     resource_uri= CharField(db_column='resource_uri',  null=True)
     log_type = CharField(db_column='log_type', null=True)
     user_id = CharField(db_column='user_id',  null=True)

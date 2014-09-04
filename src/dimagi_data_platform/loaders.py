@@ -103,9 +103,9 @@ class DomainLoader(Loader):
                 
             if dname not in self._first_col_names_to_skip:
                 
-                annotations = annotations.select().where(IncomingDomainAnnotation.attributes.contains({'Domain name': dname}))
+                my_annotations = annotations.select().where(IncomingDomainAnnotation.attributes.contains({'Domain name': dname}))
                 try:
-                    attrs.update(annotations.get().attributes)
+                    attrs.update(my_annotations.get().attributes)
                 except IncomingDomainAnnotation.DoesNotExist:
                     pass
                 

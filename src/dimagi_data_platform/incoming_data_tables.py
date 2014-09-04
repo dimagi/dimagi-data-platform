@@ -143,7 +143,7 @@ class IncomingWebUser(BaseDomainLinkedModel):
     email = CharField(db_column='email', max_length=255, null=True)
     is_admin = BooleanField(db_column='is_admin', null=True)
     resource_uri = CharField(db_column='resource_uri', null=True)
-    webuser_role = CharField(db_column='webuser_role',max_length=255, null=True)
+    webuser_role = CharField(db_column='webuser_role', null=True)
     phone_numbers= CharField(db_column='phone_numbers',  null=True)
     
     class Meta:

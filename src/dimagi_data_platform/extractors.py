@@ -19,6 +19,7 @@ import slumber
 import sqlalchemy
 
 import conf
+from dimagi_data_platform.data_warehouse_db import Domain, DeviceLog
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
     IncomingCases, IncomingUser, IncomingDeviceLog, IncomingWebUser, \
     IncomingFormDef
@@ -315,6 +316,12 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
         '''
         Constructor
         '''  
+        
+        # check if we have any existing device logs in the db for this domain. If not, try to import everything, ignoring the since param
+        d = Domain.get(name=domain)
+        if DeviceLog.select().where(DeviceLog.domain == d).count() == 0:
+            since = None
+            
         super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, since, domain)
 
     @property

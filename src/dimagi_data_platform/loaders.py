@@ -121,14 +121,14 @@ class DomainLoader(Loader):
                 domain.business_unit = attrs['Business unit'] if 'Business unit' in attrs else None
                 domain.attributes = attrs
                 
-                sector_name_hq = [attrs["Sector"]] if "Sector" in attrs else None
+                sector_name_hq = [attrs["Sector"]] if "Sector" in attrs else []
                 sector_names_annotations = [k.replace('Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sector_') & (v == 'Yes'))]
-                sector_names = list() + sector_name_hq + sector_names_annotations
+                sector_names = sector_name_hq + sector_names_annotations
                 sector_names = [s for s in sector_names if (s is not None and not (s == "") and not (s == "No info"))]
                 
-                subsector_name_hq = [attrs["Sub-Sector"]] if "Sub-Sector" in attrs else None
+                subsector_name_hq = [attrs["Sub-Sector"]] if "Sub-Sector" in attrs else []
                 subsector_names_annotations = [k.replace('Sub-Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sub-Sector_') & (v == 'Yes'))]
-                subsector_names = list() + subsector_name_hq + subsector_names_annotations
+                subsector_names = subsector_name_hq + subsector_names_annotations
                 subsector_names = [sb for sb in subsector_names if (sb is not None and not (sb == "") and not (sb == "No info"))]
                 
                 self.update_sectors(domain, sector_names, subsector_names)

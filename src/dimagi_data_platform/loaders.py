@@ -590,18 +590,17 @@ class DeviceLogLoader(Loader):
         user_id_q = self.domain.users.select()
         user_id_dict = dict([(u.user, u.id) for u in user_id_q])
         
+        existing_cur = DeviceLog._meta.database.execute_sql('select api_id from device_log '
+                                                            'where device_log.domain_id = %d' % self.domain.id)
+        existing_log_ids = [d[0] for d in existing_cur.fetchall()]
+        
+        insert_dicts = []
+        
         unimported_logs = IncomingDeviceLog.get_unimported(self.domain.name)
         logger.info('Incoming device log table has %d records not imported' % unimported_logs.count())
         
         for inc in unimported_logs.iterator():
-            try:
-                domain = Domain.get(name=inc.domain)
-            except Domain.DoesNotExist:
-                logger.warn('Domain with name %s does not exist, could not add Device Log ' % (domain))
-                continue
-            try:
-                dev = DeviceLog.get(api_id=inc.api_id, domain=domain)
-            except DeviceLog.DoesNotExist:
+            if inc.api_id not in existing_log_ids:
                 log_date = datetime.datetime.strptime(inc.log_date, '%Y-%m-%dT%H:%M:%S') if inc.log_date else None
                 
                 if (inc.user_id):

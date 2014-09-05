@@ -109,9 +109,9 @@ class IncomingUser(BaseDomainLinkedModel):
     last_name = CharField(db_column='last_name', max_length=255, null=True)
     default_phone_number = CharField(db_column='default_phone_number', max_length=255, null=True)
     email = CharField(db_column='email', max_length=255, null=True)
-    groups = CharField(db_column='groups', null=True)
-    phone_numbers= CharField(db_column='phone_numbers',  null=True)
-    user_data = CharField(db_column='user_data',  null=True)
+    groups = TextField(db_column='groups', null=True)
+    phone_numbers= TextField(db_column='phone_numbers',  null=True)
+    user_data = TextField(db_column='user_data',  null=True)
     
     class Meta:
         db_table = 'incoming_users'
@@ -124,8 +124,8 @@ class IncomingDeviceLog(BaseDomainLinkedModel):
     i = IntegerField(db_column='i', null=True)
     api_id = IntegerField(db_column='api_id', null=True)
     msg = TextField(db_column='msg', null=True)
-    resource_uri= CharField(db_column='resource_uri',  null=True)
-    log_type = CharField(db_column='log_type', null=True)
+    resource_uri= TextField(db_column='resource_uri',  null=True)
+    log_type = TextField(db_column='log_type', null=True)
     user_id = CharField(db_column='user_id',  null=True)
     username = CharField(db_column='username',  null=True)
     xform_id = CharField(db_column='xform_id',  null=True)
@@ -144,7 +144,7 @@ class IncomingWebUser(BaseDomainLinkedModel):
     is_admin = BooleanField(db_column='is_admin', null=True)
     resource_uri = CharField(db_column='resource_uri', null=True)
     webuser_role = CharField(db_column='webuser_role', null=True)
-    phone_numbers= CharField(db_column='phone_numbers',  null=True)
+    phone_numbers= TextField(db_column='phone_numbers',  null=True)
     
     class Meta:
         db_table = 'incoming_web_user'

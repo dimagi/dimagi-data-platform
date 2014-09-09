@@ -82,7 +82,7 @@ class FormDefinition(BaseModel):
     xmlns = CharField(max_length=255, null=True)
     app_id = CharField(max_length=255, null=True)
     
-    app_name = CharField(db_column='app_name', max_length=255, null=True)
+    app_name = TextField(db_column='app_name', null=True)
     form_names = HStoreField(db_column='form_names', null=True)
     formdef_json = JSONField(db_column='formdef_json', null=True)
     
@@ -208,14 +208,10 @@ class DeviceLog(BaseModel):
     msg = TextField(db_column='msg', null=True)
     resource_uri= CharField(db_column='resource_uri',  null=True)
     log_type = CharField(db_column='log_type', null=True)
-    form = CharField(db_column='form_id', max_length=255, null=True)
+    form = CharField(db_column='form_id', max_length=255, null=True) # this is the device log xform, not the form the user is submitting
     
     user = ForeignKeyField(db_column='user_id',  null=True, rel_model=User, related_name='device_logs')
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='device_logs')
-    
-    
-    '''decided to keep form fk out of the log table for now because it's so big'''
-    #form = ForeignKeyField(db_column='form_id',  null=True, rel_model=Form, related_name='devicelogs')
     
     class Meta:
         db_table = 'device_log'

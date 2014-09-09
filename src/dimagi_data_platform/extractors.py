@@ -377,7 +377,6 @@ class CommCareSlumberFormDefExtractor(Extractor):
             for mod in app['modules']:
                 for form in mod['forms']:
                     names = json.dumps(form['name'])
-                    
                     fd = IncomingFormDef(app_id=app["id"], app_name=app["name"], domain=self.domain, case_type=mod["case_type"],form_names=names, form_xmlns = form["xmlns"])
                     fd.formdef_json = json.dumps(form, ensure_ascii=False)
                     fd.save()

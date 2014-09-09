@@ -152,7 +152,7 @@ models.append(IncomingWebUser)
 
 class IncomingFormDef(BaseDomainLinkedModel):
     app_id = CharField(db_column='app_id', max_length=255, null=True)
-    app_name = CharField(db_column='app_name', max_length=255, null=True)
+    app_name = TextField(db_column='app_name', null=True)
     form_names = TextField(db_column='form_names', null=True)
     form_xmlns = CharField(db_column='form_xmlns', max_length=255, null=True)
     formdef_json = TextField(db_column='formdef_json', null=True)

@@ -26,6 +26,7 @@ from dimagi_data_platform.utils import get_domains, configure_logger
 
 
 logger = logging.getLogger('dimagi_data_platform')
+db = conf.PEEWEE_DB_CON
         
 def setup():
     configure_logger(logger)
@@ -52,6 +53,59 @@ def update_platform_data():
         
     for importer in importers:
             importer.do_cleanup()
+
+@db.commit_on_success            
+def update_for_domain(dname, password):
+    d = Domain.get(name=dname)
+    since = d.last_hq_import
+    
+    extracters = []
+    extracters.append(CommCareExportCaseExtractor(since, dname))
+    extracters.append(CommCareExportFormExtractor(since, dname))
+    extracters.append(CommCareExportUserExtractor(since, dname))
+    extracters.append(CommCareExportWebUserExtractor(since, dname))
+    extracters.append(CommCareExportDeviceLogExtractor(since, dname))   
+    extracters.append(CommCareSlumberFormDefExtractor('v0.5', dname, conf.CC_USER, password))        
+
+    logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
+    api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(conf.CC_USER, password)
+    
+    for extracter in extracters:
+        if (isinstance(extracter, CommCareExportExtractor)):
+            extracter.set_api_client(api_client)
+        extracter.do_extract()
+        
+    d.last_hq_import = datetime.datetime.now()
+    d.save()
+    
+    forms_to_import = IncomingForm.get_unimported(dname).count()
+    cases_to_import = IncomingCases.get_unimported(dname).count()
+    device_logs_to_import = IncomingDeviceLog.get_unimported(dname).count()
+    
+    loaders = []
+    if (forms_to_import > 0) or (cases_to_import > 0) or (device_logs_to_import > 0):
+        logger.info('We have %d forms and %d cases to import' % (forms_to_import, cases_to_import))
+        # all these loaders get data from forms, cases or device logs
+        loaders.append(UserLoader(dname))
+        loaders.append(FormLoader(dname))
+        loaders.append(CasesLoader(dname))
+        loaders.append(CaseEventLoader(dname))
+        loaders.append(VisitLoader(dname))
+        loaders.append(DeviceLogLoader(dname))
+    else:
+        logger.info('No forms, cases or device logs to import for domain %s' % (d.name))
+    
+    # these loaders should run even if there are no new forms, cases or device logs
+    loaders.append(FormDefLoader(dname))
+    loaders.append(WebUserLoader(dname))
+        
+    logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
+    
+    for loader in loaders:
+        loader.do_load()
+        
+    for extracter in extracters:
+        extracter.do_cleanup()
             
 def update_for_domains(domainlist, password):
     '''
@@ -59,59 +113,10 @@ def update_for_domains(domainlist, password):
     '''   
     for dname in domainlist:
         try:
-            d = Domain.get(name=dname)
-            since = d.last_hq_import
-            
-            extracters = []
-            extracters.append(CommCareExportCaseExtractor(since, dname))
-            extracters.append(CommCareExportFormExtractor(since, dname))
-            extracters.append(CommCareExportUserExtractor(since, dname))
-            extracters.append(CommCareExportWebUserExtractor(since, dname))
-            extracters.append(CommCareExportDeviceLogExtractor(since, dname))   
-            extracters.append(CommCareSlumberFormDefExtractor('v0.5', dname, conf.CC_USER, password))        
-
-            logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))
-            api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(conf.CC_USER, password)
-            
-            for extracter in extracters:
-                if (isinstance(extracter, CommCareExportExtractor)):
-                    extracter.set_api_client(api_client)
-                extracter.do_extract()
-                
-            d.last_hq_import = datetime.datetime.now()
-            d.save()
-            
-            forms_to_import = IncomingForm.get_unimported(dname).count()
-            cases_to_import = IncomingCases.get_unimported(dname).count()
-            device_logs_to_import = IncomingDeviceLog.get_unimported(dname).count()
-            
-            loaders = []
-            if (forms_to_import > 0) or (cases_to_import > 0) or (device_logs_to_import > 0):
-                logger.info('We have %d forms and %d cases to import' % (forms_to_import, cases_to_import))
-                # all these loaders get data from forms, cases or device logs
-                loaders.append(UserLoader(dname))
-                loaders.append(FormLoader(dname))
-                loaders.append(CasesLoader(dname))
-                loaders.append(CaseEventLoader(dname))
-                loaders.append(VisitLoader(dname))
-                loaders.append(DeviceLogLoader(dname))
-            else:
-                logger.info('No forms, cases or device logs to import for domain %s' % (d.name))
-            
-            # these loaders should run even if there are no new forms, cases or device logs
-            loaders.append(FormDefLoader(dname))
-            loaders.append(WebUserLoader(dname))
-                
-            logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
-            
-            for loader in loaders:
-                loader.do_load()
-                
-            for extracter in extracters:
-                extracter.do_cleanup()
+            update_for_domain(dname, password)
                 
         except Exception, e:
-                logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % d.name)
+                logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % dname.name)
                 logger.exception(e)
 
         

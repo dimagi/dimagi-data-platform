@@ -116,7 +116,7 @@ def update_for_domains(domainlist, password):
             update_for_domain(dname, password)
                 
         except Exception, e:
-                logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % dname.name)
+                logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % dname)
                 logger.exception(e)
 
         

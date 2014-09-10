@@ -78,26 +78,29 @@ def update_for_domain(dname, password):
     d.last_hq_import = datetime.datetime.now()
     d.save()
     
+    loaders = []
+    # these loaders should run even if there are no new forms, cases or device logs
+    loaders.append(UserLoader(dname))
+    loaders.append(FormDefLoader(dname))
+    loaders.append(WebUserLoader(dname))
+    
     forms_to_import = IncomingForm.get_unimported(dname).count()
     cases_to_import = IncomingCases.get_unimported(dname).count()
     device_logs_to_import = IncomingDeviceLog.get_unimported(dname).count()
     
-    loaders = []
-    if (forms_to_import > 0) or (cases_to_import > 0) or (device_logs_to_import > 0):
-        logger.info('We have %d forms and %d cases to import' % (forms_to_import, cases_to_import))
-        # all these loaders get data from forms, cases or device logs
-        loaders.append(UserLoader(dname))
-        loaders.append(FormLoader(dname))
+    if (cases_to_import > 0):
+        logger.info('We have %d cases to import' % cases_to_import)
         loaders.append(CasesLoader(dname))
+        
+    if (forms_to_import > 0):
+        logger.info('We have %d forms to import' % forms_to_import)
+        loaders.append(FormLoader(dname))
         loaders.append(CaseEventLoader(dname))
         loaders.append(VisitLoader(dname))
-        loaders.append(DeviceLogLoader(dname))
-    else:
-        logger.info('No forms, cases or device logs to import for domain %s' % (d.name))
     
-    # these loaders should run even if there are no new forms, cases or device logs
-    loaders.append(FormDefLoader(dname))
-    loaders.append(WebUserLoader(dname))
+    if (device_logs_to_import > 0):
+        logger.info('We have %d device log entries to import' % device_logs_to_import)
+        loaders.append(DeviceLogLoader(dname))
         
     logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
     

@@ -119,6 +119,11 @@ class DomainLoader(Loader):
                 domain.services = attrs['Services'] if 'Services' in attrs else None
                 domain.project_state = attrs['Project State'] if 'Project State' in attrs else None
                 domain.business_unit = attrs['Business unit'] if 'Business unit' in attrs else None
+                if 'Test Project?' in attrs:
+                    domain.test = (attrs['Test Project?'].lower() == "true")
+                if 'Active?' in attrs:
+                    domain.active = (attrs['Active?'].lower() == "true")
+                    
                 domain.attributes = attrs
                 
                 sector_name_hq = [attrs["Sector"]] if "Sector" in attrs else []

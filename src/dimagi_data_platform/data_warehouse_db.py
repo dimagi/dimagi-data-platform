@@ -50,8 +50,10 @@ class Domain(BaseModel):
     organization = CharField(max_length=255, null=True)
     country = CharField(max_length=255, null=True)
     services = CharField(max_length=255, null=True)
-    project_state =CharField(max_length=255, null=True)
-    business_unit =CharField(max_length=255, null=True)
+    project_state = CharField(max_length=255, null=True)
+    business_unit = CharField(max_length=255, null=True)
+    active =  BooleanField(null=True)
+    test =  BooleanField(null=True)
     last_hq_import = DateTimeField(null=True)
     
     attributes = HStoreField(null=True)

@@ -26,12 +26,13 @@ def configure_logger(lg):
 
     logging.getLogger('').addHandler(logger_consol_handler)
 
-def get_domains(domain_conf_json):
+def get_domains(domain_conf_json, active_only=False):
     '''
     returns names of domains to run on, specified by names or filters.
     named domains are always included in a run.
     filters are AND'd together - a domain is included only if it matches all filters
     there is one special case. if the value of domains is the string "all", all domains are included.
+    the active_only flag is applied after the domain_conf is processed, and indicates whether inactive domains should be returned
     '''
     logger.info('processing domain conf sections: %s'% domain_conf_json)
     
@@ -82,7 +83,11 @@ def get_domains(domain_conf_json):
         if filter_lists:
             domains.extend(set(filter_lists[0]).intersection(*filter_lists))
     
-    return list(set(domains))
+    conf_domains = list(set(domains))
+    if active_only:
+        active_domains = Domain.select().where((Domain.name << conf_domains) and (Domain.active == True))
+        return [d.name for d in active_domains]
+    return conf_domains
 
 def break_into_chunks(l, n):
     '''

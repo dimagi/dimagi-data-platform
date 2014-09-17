@@ -51,7 +51,7 @@ with open('config_run.json', 'r') as f:
 if not _run_conf:
     raise RuntimeError('Could not load run config file!') 
 
-DOMAIN_CONF_JSON = _run_conf['domains']
+RUN_CONF_JSON = _run_conf
 
 
 

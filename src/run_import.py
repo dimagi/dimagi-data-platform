@@ -130,7 +130,7 @@ def main():
         
         logger.info('TIMESTAMP updating hq admin data - domains, forms definitions %s' % datetime.datetime.now())
         update_hq_admin_data()
-        domain_list = get_domains(conf.DOMAIN_CONF_JSON, active_only=True)
+        domain_list = get_domains(conf.RUN_CONF_JSON)
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))

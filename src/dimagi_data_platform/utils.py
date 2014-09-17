@@ -26,18 +26,20 @@ def configure_logger(lg):
 
     logging.getLogger('').addHandler(logger_consol_handler)
 
-def get_domains(domain_conf_json, active_only=False):
+def get_domains(run_conf_json):
     '''
     returns names of domains to run on, specified by names or filters.
     named domains are always included in a run.
     filters are AND'd together - a domain is included only if it matches all filters
     there is one special case. if the value of domains is the string "all", all domains are included.
-    the active_only flag is applied after the domain_conf is processed, and indicates whether inactive domains should be returned
+    the active_only flag is applied after the names section is processed, and indicates whether inactive domains should be returned
     '''
+    active_only = run_conf_json['active_domains_only']
+    domain_conf_json = run_conf_json['domains']
     logger.info('processing domain conf sections: %s'% domain_conf_json)
     
     if domain_conf_json == 'all':
-        return [dm.name for dm in Domain.select()]
+        return [dm.name for dm in Domain.select().where(Domain.active==True)] if active_only else [dm.name for dm in Domain.select()]
     
     domains = []
     domain_db_cols = [d.db_column for d in Domain._meta.fields.values()]
@@ -84,8 +86,10 @@ def get_domains(domain_conf_json, active_only=False):
             domains.extend(set(filter_lists[0]).intersection(*filter_lists))
     
     conf_domains = list(set(domains))
+    print conf_domains
+    
     if active_only:
-        active_domains = Domain.select().where((Domain.name << conf_domains) and (Domain.active == True))
+        active_domains = Domain.select().where((Domain.name << conf_domains) & (Domain.active == True))
         return [d.name for d in active_domains]
     return conf_domains
 

@@ -64,7 +64,7 @@ def update_for_domain(dname, password):
     extracters.append(CommCareExportFormExtractor(since, dname))
     extracters.append(CommCareExportUserExtractor(since, dname))
     extracters.append(CommCareExportWebUserExtractor(since, dname))
-    extracters.append(CommCareExportDeviceLogExtractor(since, dname))   
+    #extracters.append(CommCareExportDeviceLogExtractor(since, dname))   
     extracters.append(CommCareSlumberFormDefExtractor('v0.5', dname, conf.CC_USER, password))        
 
     logger.info('TIMESTAMP starting commcare export for domain %s %s' % (d.name, datetime.datetime.now()))

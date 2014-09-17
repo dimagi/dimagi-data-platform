@@ -630,8 +630,9 @@ class DeviceLogLoader(Loader):
                 insert_dicts.append(row)
     
         if insert_dicts:
-            logger.info("inserting %d device log entries for domain %s" % (len(insert_dicts), self.domain.name))
-            self.insert_chunked(insert_dicts)
+            deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
+            logger.info("inserting %d device log entries for domain %s" % (len(deduped), self.domain.name))
+            self.insert_chunked(deduped)
                 
 
             

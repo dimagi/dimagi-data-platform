@@ -31,7 +31,9 @@ class Loader(object):
     
     def __init__(self):
         super(Loader, self).__init__()
+        pass
     
+    def do_load(self):
         pass
     
     def insert_chunked(self, l):
@@ -139,7 +141,6 @@ class DomainLoader(Loader):
                 self.update_sectors(domain, sector_names, subsector_names)
                 
                 domain.save()
-
                 
 class FormDefLoader(Loader):
     '''
@@ -386,7 +387,7 @@ class FormLoader(Loader):
         self.domain = Domain.get(name=domain)
         super(FormLoader, self).__init__()
         
-    def do_load(self):
+    def load_forms(self):
         logger.info('TIMESTAMP starting form table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         incform_q = IncomingForm.get_unimported(self.domain.name)
         logger.info('Incoming form table has %d records not imported' % incform_q.count())
@@ -427,23 +428,8 @@ class FormLoader(Loader):
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
             logger.info("inserting %d forms for domain %s" % (len(deduped), self.domain.name))
             self.insert_chunked(deduped)
-
-
-class CaseEventLoader(Loader):
-    '''
-    loads data to the case event table from incoming forms
-    '''
-    
-    _db_warehouse_table_class = CaseEvent
-
-    def __init__(self, domain):
-        '''
-        Constructor
-        '''
-        self.domain = Domain.get(name=domain)
-        super(CaseEventLoader, self).__init__()
-        
-    def do_load(self):
+            
+    def load_caseevents(self):
         logger.info('TIMESTAMP starting case event table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         ce_q = IncomingForm.select(IncomingForm.form, IncomingForm.case, IncomingForm.alt_case).where((IncomingForm.domain == self.domain.name) 
                                                                                                       & ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
@@ -479,6 +465,10 @@ class CaseEventLoader(Loader):
         if insert_dicts:
             logger.info("inserting %d case events for domain %s" % (len(insert_dicts), self.domain.name))
             self.insert_chunked(insert_dicts)
+        
+    def do_load(self):
+        self.load_forms()
+        self.load_caseevents()
 
 class VisitLoader(Loader):
     '''
@@ -608,10 +598,10 @@ class DeviceLogLoader(Loader):
             if inc.api_id not in existing_log_ids:
                 try:
                     log_date = datetime.datetime.strptime(inc.log_date, '%Y-%m-%dT%H:%M:%S') if inc.log_date else None
-                except ValueError, v: # this is for log entries with decimal seconds 
+                except ValueError, v:  # this is for log entries with decimal seconds 
                     # see http://stackoverflow.com/questions/5045210/how-to-remove-unconverted-data-from-a-python-datetime-object
                     if len(v.args) > 0 and v.args[0].startswith('unconverted data remains: '):
-                        stripped_date = inc.log_date[:-(len(v.args[0])-26)]
+                        stripped_date = inc.log_date[:-(len(v.args[0]) - 26)]
                         log_date = datetime.datetime.strptime(stripped_date, '%Y-%m-%dT%H:%M:%S')
                     else:
                         raise v
@@ -622,11 +612,11 @@ class DeviceLogLoader(Loader):
                     else:
                         user_id = User.create(user=inc.user_id)
                 else:
-                    user_id=None
+                    user_id = None
                         
-                row = {'api_id':inc.api_id, 'domain':self.domain.id,'app_version':inc.app_version,
-                       'log_date':log_date,'device_id':inc.device_id, 'form':inc.xform_id,
-                       'i':inc.i,'msg':inc.msg, 'resource_uri':inc.resource_uri,'log_type':inc.log_type, 'user':user_id}
+                row = {'api_id':inc.api_id, 'domain':self.domain.id, 'app_version':inc.app_version,
+                       'log_date':log_date, 'device_id':inc.device_id, 'form':inc.xform_id,
+                       'i':inc.i, 'msg':inc.msg, 'resource_uri':inc.resource_uri, 'log_type':inc.log_type, 'user':user_id}
                 insert_dicts.append(row)
     
         if insert_dicts:

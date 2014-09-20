@@ -3,6 +3,7 @@ Created on Jun 6, 2014
 
 @author: mel
 '''
+import datetime
 import json
 import logging
 import os
@@ -19,7 +20,8 @@ import slumber
 import sqlalchemy
 
 import conf
-from dimagi_data_platform.data_warehouse_db import Domain, DeviceLog
+from dimagi_data_platform.data_warehouse_db import Domain, DeviceLog, \
+    HQExtractLog
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
     IncomingCases, IncomingUser, IncomingDeviceLog, IncomingWebUser, \
     IncomingFormDef
@@ -70,23 +72,37 @@ class Extractor(object):
         if hstorecols:
             return hstorecols[0]
         
+    def extract(self):
+        self.do_extract()
+        
+    def cleanup(self):
+        self.do_cleanup()
+        
     def do_extract(self):
-        pass
+        raise NotImplementedError("Subclass must implement do_extract")
     
     def do_cleanup(self):
-        pass
+        raise NotImplementedError("Subclass must implement do_cleanup")
 
 class CommCareExportExtractor(Extractor):
     '''
     An extractor that uses commcare-export
     '''
 
-    def __init__(self, incoming_table_class, since, domain):
+    def __init__(self, incoming_table_class, domain):
         '''
         Constructor
         '''
+        # TODO should deal in domain objects only, not domain names
         self.domain = domain
-        self.since = since
+        d = Domain.get(name=self.domain)
+        self.extract_log = HQExtractLog(extractor = self.__class__.__name__, domain = d)
+        
+        try:
+            last_extract_log = HQExtractLog.get_last_extract_log(self.__class__.__name__, d)
+            self.since = last_extract_log.extract_start
+        except HQExtractLog.DoesNotExist:
+            self.since = None
         self._incoming_table_class = incoming_table_class
         
         super(CommCareExportExtractor, self).__init__(self._incoming_table_class)
@@ -99,7 +115,8 @@ class CommCareExportExtractor(Extractor):
         self.api_client = api_client
     
     def do_extract(self):
-        
+        self.extract_log.extract_start = datetime.datetime.now()
+        logger.info("%s extract for domain %s, requesting records since %s" % (self.__class__.__name__, self.domain, self.since if self.since else 'forever'))
         if not self.api_client:
             raise Exception('CommCareExportExtractor needs an initialized API client')
         
@@ -124,7 +141,10 @@ class CommCareExportExtractor(Extractor):
         update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.domain == self.domain) 
                                                                           & ((self._incoming_table_class.imported == False) | (self._incoming_table_class.imported >> None)))
         rows = update_q.execute()
+        
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
+        self.extract_log.extract_end = datetime.datetime.now()
+        self.extract_log.save()
             
 class CommCareExportFormExtractor(CommCareExportExtractor):
     '''
@@ -134,11 +154,11 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingForm
     
-    def __init__(self, since, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''
-        super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, domain)
     
     @property
     def _get_query(self):
@@ -188,11 +208,11 @@ class CommCareExportCaseExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingCases
     
-    def __init__(self, since, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''  
-        super(CommCareExportCaseExtractor, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportCaseExtractor, self).__init__(self._incoming_table_class, domain)
     
     @property
     def _get_query(self):
@@ -230,11 +250,11 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingUser
     
-    def __init__(self, since, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''  
-        super(CommCareExportUserExtractor, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportUserExtractor, self).__init__(self._incoming_table_class, domain)
     
     @property
     def _get_query(self):
@@ -270,11 +290,11 @@ class CommCareExportWebUserExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingWebUser
     
-    def __init__(self, since, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''  
-        super(CommCareExportWebUserExtractor, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportWebUserExtractor, self).__init__(self._incoming_table_class, domain)
     
     @property
     def _get_query(self):
@@ -312,7 +332,7 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingDeviceLog
     
-    def __init__(self, since, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''  
@@ -322,7 +342,7 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
         if DeviceLog.select().where(DeviceLog.domain == d).count() == 0:
             since = None
             
-        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, domain)
 
     @property
     def _get_query(self):

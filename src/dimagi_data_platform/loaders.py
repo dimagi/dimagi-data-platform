@@ -36,17 +36,19 @@ class Loader(object):
     def do_load(self):
         pass
     
-    def insert_chunked(self, l):
+    def insert_chunked(self, l, db_table_class=None):
         
-        if not self._db_warehouse_table_class:
-            logger.error('No data warehouse table class is defined, cannot insert chunked list')
+        if (not db_table_class and not self._db_warehouse_table_class):
+            logger.error('No data warehouse table class is defined and none supplies, cannot insert chunked list')
         else:
+            if db_table_class is None:
+                db_table_class = self._db_warehouse_table_class
             chunks = break_into_chunks(l, 5000)
             count = 0
             for chunk in chunks:
                 count = count + 1
                 logger.info('inserting chunk %d of %d' % (count, len(chunks)))
-                self._db_warehouse_table_class.insert_many(chunk).execute()
+                db_table_class.insert_many(chunk).execute()
     
 
 class DomainLoader(Loader):
@@ -428,8 +430,21 @@ class FormLoader(Loader):
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
             logger.info("inserting %d forms for domain %s" % (len(deduped), self.domain.name))
             self.insert_chunked(deduped)
-            
-    def load_caseevents(self):
+        
+    def do_load(self):
+        self.load_forms()
+        
+class CaseEventLoader(Loader):
+    '''
+    loads data to the caseevent table form incoming forms
+    '''
+    _db_warehouse_table_class = CaseEvent
+    
+    def __init__(self, domain):
+        self.domain = Domain.get(name=domain)
+        super(CaseEventLoader, self).__init__()
+        
+    def do_load(self):
         logger.info('TIMESTAMP starting case event table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         ce_q = IncomingForm.select(IncomingForm.form, IncomingForm.case, IncomingForm.alt_case).where((IncomingForm.domain == self.domain.name) 
                                                                                                       & ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
@@ -465,10 +480,6 @@ class FormLoader(Loader):
         if insert_dicts:
             logger.info("inserting %d case events for domain %s" % (len(insert_dicts), self.domain.name))
             self.insert_chunked(insert_dicts)
-        
-    def do_load(self):
-        self.load_forms()
-        self.load_caseevents()
 
 class VisitLoader(Loader):
     '''

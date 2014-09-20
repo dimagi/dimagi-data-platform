@@ -219,6 +219,21 @@ class DeviceLog(BaseModel):
         db_table = 'device_log'
 models.append(DeviceLog)
 
+class HQExtractLog(BaseModel):
+    extractor = CharField(db_column='extractor', max_length=255)
+    extract_start = DateTimeField()
+    extract_end = DateTimeField()
+    
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='hq_extract_logs')
+    
+    @classmethod
+    def get_last_extract_log(cls,extractor_name, domain):
+        q = HQExtractLog.select().where((HQExtractLog.extractor == extractor_name) & (HQExtractLog.domain == domain)).order_by(HQExtractLog.extract_start.desc())
+        return q.get()
+    
+    class Meta:
+        db_table = 'hq_extract_log'
+models.append(HQExtractLog)
 
 def create_missing_tables():
     database.connect()

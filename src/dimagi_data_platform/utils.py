@@ -86,7 +86,6 @@ def get_domains(run_conf_json):
             domains.extend(set(filter_lists[0]).intersection(*filter_lists))
     
     conf_domains = list(set(domains))
-    print conf_domains
     
     if active_only:
         active_domains = Domain.select().where((Domain.name << conf_domains) & (Domain.active == True))

@@ -16,6 +16,7 @@ from pandas.core.common import notnull
 from pandas.io.excel import ExcelFile
 from playhouse.postgres_ext import HStoreField
 from requests.auth import HTTPDigestAuth
+from simple_salesforce.api import Salesforce, SalesforceMalformedRequest
 import slumber
 import sqlalchemy
 
@@ -24,7 +25,7 @@ from dimagi_data_platform.data_warehouse_db import Domain, DeviceLog, \
     HQExtractLog
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
     IncomingCases, IncomingUser, IncomingDeviceLog, IncomingWebUser, \
-    IncomingFormDef
+    IncomingFormDef, IncomingSalesforceRecord
 from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 
@@ -474,6 +475,45 @@ class ExcelExtractor(Extractor):
         delete_q = self._incoming_table_class.delete()
         rows = delete_q.execute()
         logger.info('Deleted %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
+        
+class SalesforceExtractor(Extractor):
+    
+    _incoming_table_class = IncomingSalesforceRecord
+    
+    def __init__(self, username, password, token):
+        '''
+        Constructor
+        '''
+        self.api = Salesforce(username=username, password=password, security_token=token)
+        super(SalesforceExtractor, self).__init__(self._incoming_table_class)
+    
+    def do_extract(self):
+        res = self.api.describe()
+        obj_names = [obj['name'] for obj in res['sobjects']]
+        obj_ids = dict()
+        
+        for obj in obj_names:
+            try:
+                id_res = self.api.query_all('SELECT Id from %s' %obj)
+                ids = [rec['Id'] for rec in id_res['records']]
+                obj_ids[obj] = ids
+            except SalesforceMalformedRequest, m:
+                logger.warn('Got SalesforceMalformedRequest when querying Ids for object %s' % obj)
+                logger.warn(str(m))
+                
+        for obj in obj_ids.keys():
+            api_method_call =  getattr(self.api, obj)
+            for id in obj_ids[obj]:
+                try:
+                    rec = api_method_call.get(id)
+                    IncomingSalesforceRecord.create(sf_id=id,object_type=obj,record=json.dumps(rec))
+                except Exception, e:
+                    logger.warn('Exception while trying to get salesforce object of type %s with id %s' % (obj,id))
+                    logger.warn(str(e))
+
+    
+    def do_cleanup(self):
+        pass
 
 
     

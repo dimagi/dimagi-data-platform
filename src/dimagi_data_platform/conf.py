@@ -41,6 +41,10 @@ PEEWEE_DB_CON = PostgresqlExtDatabase(DB_NAME, **{'host': DB_HOST, 'password': D
 AWS_S3_INPUT_URL = _json_conf['s3']['input_url']
 AWS_S3_OUTPUT_URL = _json_conf['s3']['output_url']
 
+SALESFORCE_USER = _json_conf['salesforce']['username']
+SALESFORCE_PASS = _json_conf['salesforce']['password']
+SALESFORCE_TOKEN = _json_conf['salesforce']['token']
+
 '''
 RUN CONFIGURATION - config_run.json
 Configures domains to update.

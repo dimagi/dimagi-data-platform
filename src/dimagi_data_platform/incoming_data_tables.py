@@ -161,6 +161,15 @@ class IncomingFormDef(BaseDomainLinkedModel):
         db_table = 'incoming_formdef'
 models.append(IncomingFormDef)
         
+class IncomingSalesforceRecord(BaseModel):
+    sf_id = TextField()
+    object_type = TextField()
+    record = JSONField()
+
+    class Meta:
+        db_table = 'incoming_salesforce_record'
+models.append(IncomingSalesforceRecord)
+        
 def create_missing_tables():
     database.connect()
     

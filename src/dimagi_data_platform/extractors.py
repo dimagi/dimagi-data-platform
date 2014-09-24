@@ -490,26 +490,40 @@ class SalesforceExtractor(Extractor):
     def do_extract(self):
         res = self.api.describe()
         obj_names = [obj['name'] for obj in res['sobjects']]
-        obj_ids = dict()
+        obj_fields = dict()
         
         for obj in obj_names:
+            api_method_call =  getattr(self.api, obj)
             try:
-                id_res = self.api.query_all('SELECT Id from %s' %obj)
-                ids = [rec['Id'] for rec in id_res['records']]
-                obj_ids[obj] = ids
+                obj_meta = api_method_call.describe()
+                field_names = [field['name'] for field in obj_meta['fields']]
+                obj_fields[obj] = field_names
+                
             except SalesforceMalformedRequest, m:
-                logger.warn('Got SalesforceMalformedRequest when querying Ids for object %s' % obj)
+                logger.warn('Got SalesforceMalformedRequest when querying metadata for object %s' % obj)
                 logger.warn(str(m))
                 
-        for obj in obj_ids.keys():
-            api_method_call =  getattr(self.api, obj)
-            for id in obj_ids[obj]:
-                try:
-                    rec = api_method_call.get(id)
+        for obj in obj_fields.keys():
+            fieldstr = ','.join(obj_fields[obj])
+            querystr = 'SELECT %s FROM %s' % (fieldstr,obj)
+            logger.info('Executing Salesforce query %s' % querystr)
+            records = []
+            try:
+                obj_res = self.api.query(querystr)
+                if 'records' in obj_res:
+                    records.extend(obj_res['records'])
+                while 'done' in obj_res and not obj_res['done']:
+                    obj_res = self.api.query_more(obj_res['nextRecordsUrl'], True)
+                    if 'records' in obj_res:
+                        records.extend(obj_res['records'])
+                
+                logger.info('%d results of type %s' % (len(records),obj))
+                for rec in records:
                     IncomingSalesforceRecord.create(sf_id=id,object_type=obj,record=json.dumps(rec))
-                except Exception, e:
-                    logger.warn('Exception while trying to get salesforce object of type %s with id %s' % (obj,id))
-                    logger.warn(str(e))
+                    
+            except SalesforceMalformedRequest, m:
+                logger.warn('Got SalesforceMalformedRequest when trying to retrieve all fields for object %s' % obj)
+                logger.warn(str(m))
 
     
     def do_cleanup(self):

@@ -527,7 +527,8 @@ class SalesforceExtractor(Extractor):
 
     
     def do_cleanup(self):
-        pass
-
+        delete_q = self._incoming_table_class.delete()
+        rows = delete_q.execute()
+        logger.info('Deleted %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
 
     

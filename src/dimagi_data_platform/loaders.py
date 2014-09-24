@@ -7,8 +7,11 @@ import datetime
 import json
 import logging
 
+from pandas.core.frame import DataFrame
 from peewee import prefetch
+import sqlalchemy
 
+from dimagi_data_platform import conf
 from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector, \
      User, Form, CaseEvent, Cases, FormDefinition, \
     Subsector, FormDefinitionSubsector, Visit, DomainSubsector, WebUser, \
@@ -16,7 +19,7 @@ from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector,
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm, IncomingFormDef, IncomingUser, IncomingWebUser, \
-    IncomingDeviceLog
+    IncomingDeviceLog, IncomingSalesforceRecord
 from dimagi_data_platform.utils import break_into_chunks
 
 
@@ -640,4 +643,33 @@ class DeviceLogLoader(Loader):
     def do_load(self):
         logger.info('TIMESTAMP starting device log table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         self.load_from_API()
+        
+class SalesforceObjectLoader(Loader):
+    
+    def __init__(self):
+        '''
+        Constructor
+        '''
+        self.engine = sqlalchemy.create_engine(conf.SQLALCHEMY_DB_URL)
+        super(SalesforceObjectLoader, self).__init__()
+    
+    def do_load(self):
+        all_unimported = IncomingSalesforceRecord.get_unimported()
+        object_types = all_unimported.select(IncomingSalesforceRecord.object_type).distinct()
+        
+        for obj in object_types:
+            unimported_recs = all_unimported.select().where(IncomingSalesforceRecord.object_type==obj.object_type)
+            unimported_dicts = [json.loads(rec.record) for rec in unimported_recs]
+            for d in unimported_dicts:
+                d['url'] = d['attributes']['url']
+                del d['attributes']
+                
+                for k,v in d.iteritems():
+                    if isinstance(v, dict):
+                        d[k] = json.dumps(v)
+                        
+            df = DataFrame(unimported_dicts)
+            logger.info('Writing records for Salesforce object %s to db table %s' % (obj.object_type,'sf_%s' % obj.object_type))
+            df.to_sql('sf_%s' % obj.object_type, self.engine, flavor='postgresql', if_exists='replace', index=False, index_label=None)
+            
             

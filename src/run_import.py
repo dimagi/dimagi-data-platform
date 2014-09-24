@@ -15,13 +15,15 @@ from dimagi_data_platform.extractors import ExcelExtractor, \
     CommCareExportCaseExtractor, CommCareExportFormExtractor, \
     CommCareExportUserExtractor, CommCareExportDeviceLogExtractor, \
     CommCareExportWebUserExtractor, \
-    CommCareSlumberFormDefExtractor, CommCareExportExtractor
+    CommCareSlumberFormDefExtractor, CommCareExportExtractor, \
+    SalesforceExtractor
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \
     IncomingCases, IncomingDeviceLog
 from dimagi_data_platform.loaders import DomainLoader, \
     UserLoader, FormLoader, CasesLoader, \
-    VisitLoader, FormDefLoader, WebUserLoader, DeviceLogLoader, CaseEventLoader
+    VisitLoader, FormDefLoader, WebUserLoader, DeviceLogLoader, CaseEventLoader, \
+    SalesforceObjectLoader
 from dimagi_data_platform.utils import get_domains, configure_logger
 
 
@@ -129,11 +131,21 @@ def update_for_domains(domainlist, password):
         except Exception, e:
                 logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % dname)
                 logger.exception(e)
-
+                
+def update_from_salesforce():
+    sf_extractor = SalesforceExtractor(conf.SALESFORCE_USER,conf.SALESFORCE_PASS,conf.SALESFORCE_TOKEN)
+    sf_extractor.do_extract()
+    
+    sf_loader = SalesforceObjectLoader()
+    sf_loader.do_load()
+    
+    sf_extractor.do_cleanup()
         
 def main():
         logger.info('TIMESTAMP starting run %s' % datetime.datetime.now())
         setup()
+        
+        '''
         password = getpass.getpass()
         
         logger.info('TIMESTAMP updating hq admin data - domains, forms definitions %s' % datetime.datetime.now())
@@ -143,6 +155,8 @@ def main():
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
         update_for_domains(domain_list, password)
+        '''
+        update_from_salesforce()
     
 if __name__ == '__main__':
     main()

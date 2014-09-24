@@ -496,7 +496,9 @@ class SalesforceExtractor(Extractor):
             api_method_call =  getattr(self.api, obj)
             try:
                 obj_meta = api_method_call.describe()
-                field_names = [field['name'] for field in obj_meta['fields']]
+                # get field names for everything except the content blobs
+                # if there's a blob in the record queries will return only one at a time i.e. one API call per record
+                field_names = [field['name'] for field in obj_meta['fields'] if field['type'] not in ('base64')]
                 obj_fields[obj] = field_names
                 
             except SalesforceMalformedRequest, m:

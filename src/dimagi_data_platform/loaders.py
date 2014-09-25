@@ -669,7 +669,9 @@ class SalesforceObjectLoader(Loader):
                         d[k] = json.dumps(v)
                         
             df = DataFrame(unimported_dicts)
-            logger.info('Writing records for Salesforce object %s to db table %s' % (obj.object_type,'sf_%s' % obj.object_type))
-            df.to_sql('sf_%s' % obj.object_type, self.engine, flavor='postgresql', if_exists='replace', index=False, index_label=None)
+            df.columns = [colname.lower() for colname in df.columns]
+            table_name = 'sf_%s' % (obj.object_type.lower())
+            logger.info('Writing records for Salesforce object %s to db table %s' % (obj.object_type,table_name))
+            df.to_sql(table_name, self.engine, flavor='postgresql', if_exists='replace', index=False, index_label=None)
             
             

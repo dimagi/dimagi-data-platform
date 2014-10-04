@@ -141,7 +141,7 @@ class CommCareExportExtractor(Extractor):
             raise
   
         finally:
-            if self.extract_log.extract_start or self.extract_log.extract_end:
+            if self.extract_log.extract_end:
                 self.extract_log.save()
         
     def do_extract(self):

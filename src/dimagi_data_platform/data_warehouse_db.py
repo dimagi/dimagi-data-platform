@@ -221,14 +221,14 @@ models.append(DeviceLog)
 
 class HQExtractLog(BaseModel):
     extractor = CharField(db_column='extractor', max_length=255)
-    extract_start = DateTimeField()
-    extract_end = DateTimeField()
+    extract_start = DateTimeField(null=True) # null start means we extracted records since forever
+    extract_end = DateTimeField() # extract end cannot be null, it is either the last specified extract until date, or the current date
     
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='hq_extract_logs')
     
     @classmethod
     def get_last_extract_log(cls,extractor_name, domain):
-        q = HQExtractLog.select().where((HQExtractLog.extractor == extractor_name) & (HQExtractLog.domain == domain)).order_by(HQExtractLog.extract_start.desc())
+        q = HQExtractLog.select().where((HQExtractLog.extractor == extractor_name) & (HQExtractLog.domain == domain)).order_by(HQExtractLog.extract_end.desc())
         return q.get()
     
     class Meta:

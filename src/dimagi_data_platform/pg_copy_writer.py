@@ -82,6 +82,7 @@ class PgCopyWriter(SqlTableWriter):
         super(PgCopyWriter, self).__init__(connection)
     
     def write_table(self, table, db_cols, hstore_col_name):
+        
         prefix = self.project
         
         csvdir = conf.TMP_FILES_DIR

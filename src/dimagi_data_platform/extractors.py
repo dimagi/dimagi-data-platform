@@ -102,7 +102,7 @@ class CommCareExportExtractor(Extractor):
         
         try:
             last_extract_log = HQExtractLog.get_last_extract_log(self.__class__.__name__, d)
-            self.since = last_extract_log.extract_start
+            self.since = last_extract_log.extract_end
         except HQExtractLog.DoesNotExist:
             self.since = None
         self._incoming_table_class = incoming_table_class
@@ -117,37 +117,50 @@ class CommCareExportExtractor(Extractor):
         self.api_client = api_client
         
     def extract_chunk(self, since, until):
-        logger.info("%s doing chunked extract for domain %s, requesting records since %s until %s" 
-                    % (self.__class__.__name__, self.domain, since if since else 'forever', until if until else 'forever'))
-   
-        writer = PgCopyWriter(self.engine.connect(), self.api_client.project)
+        api_call_start = datetime.datetime.now() # when did the API call start? if until is none, we will get records up to this time
+        try:
+            logger.info("%s doing chunked extract for domain %s, requesting records since %s until %s" 
+                        % (self.__class__.__name__, self.domain, since if since else 'forever', until if until else 'forever'))
+       
+            writer = PgCopyWriter(self.engine.connect(), self.api_client.project)
+            
+            env = BuiltInEnv() | CommCareHqEnv(self.api_client, since, until) | JsonPathEnv({})
+            result = self._get_query.eval(env)
+            
+            if (self._get_table_name in [t['name'] for t in env.emitted_tables()]):
+                with writer:
+                    for table in env.emitted_tables():
+                        if table['name'] == self._get_table_name:
+                            writer.write_table(table, self._get_attribute_db_cols, self._get_hstore_db_col)
+            else:
+                logger.warn('no table emitted with name %s' % self._get_table_name)
+            
+            self.extract_log.extract_end = until if until else api_call_start
         
-        env = BuiltInEnv() | CommCareHqEnv(self.api_client, since, until) | JsonPathEnv({})
-        result = self._get_query.eval(env)
-        
-        if (self._get_table_name in [t['name'] for t in env.emitted_tables()]):
-            with writer:
-                for table in env.emitted_tables():
-                    if table['name'] == self._get_table_name:
-                        writer.write_table(table, self._get_attribute_db_cols, self._get_hstore_db_col)
-        else:
-            logger.warn('no table emitted with name %s' % self._get_table_name)
+        except:
+            raise
+  
+        finally:
+            if self.extract_log.extract_start or self.extract_log.extract_end:
+                self.extract_log.save()
         
     def do_extract(self):
-        self.extract_log.extract_start = datetime.datetime.now()
+        
         if not self.api_client:
             raise Exception('CommCareExportExtractor needs an initialized API client')
         if not self.engine:
             raise Exception('CommCareExportExtractor needs a database connection engine')
         
+        self.extract_log.extract_start = self.since
+        
         if self.incremental:
-            until = (self.since + datetime.timedelta(months=1)) if self.since else datetime.datetime.strptime('01/01/2010', '%m/%d/%Y')
+            until = (self.since + datetime.timedelta(days=30)) if self.since else datetime.datetime.strptime('01/01/2010', '%m/%d/%Y')
             since = self.since
             
             while until < datetime.datetime.now():
                 self.extract_chunk(since, until)
                 since = until
-                until = since + datetime.timedelta(months=1)
+                until = since + datetime.timedelta(days=30)
            
             self.extract_chunk(since, None) # get the last chunk, until now
         
@@ -161,8 +174,6 @@ class CommCareExportExtractor(Extractor):
         rows = update_q.execute()
         
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
-        self.extract_log.extract_end = datetime.datetime.now()
-        self.extract_log.save()
             
 class CommCareExportFormExtractor(CommCareExportExtractor):
     '''
@@ -360,7 +371,7 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
         if DeviceLog.select().where(DeviceLog.domain == d).count() == 0:
             since = None
             
-        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, domain)
+        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, domain, incremental=True)
 
     @property
     def _get_query(self):

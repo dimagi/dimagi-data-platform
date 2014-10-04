@@ -73,7 +73,7 @@ def update_for_domain(dname, password):
     devicelog_extractor = CommCareExportDeviceLogExtractor(dname)
     formdef_extractor = CommCareSlumberFormDefExtractor('v0.5', dname, conf.CC_USER, password)
     
-    extracters = [case_extractor,form_extractor,user_extractor,webuser_extractor,formdef_extractor]
+    extracters = [case_extractor,form_extractor,user_extractor,webuser_extractor,formdef_extractor, devicelog_extractor]
 
     logger.info('TIMESTAMP starting commcare export for domain %s' % d.name)
     api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(conf.CC_USER, password)
@@ -145,7 +145,7 @@ def main():
         logger.info('TIMESTAMP starting run %s' % datetime.datetime.now())
         setup()
         
-        '''
+        
         password = getpass.getpass()
         
         logger.info('TIMESTAMP updating hq admin data - domains, forms definitions %s' % datetime.datetime.now())
@@ -155,7 +155,7 @@ def main():
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
         update_for_domains(domain_list, password)
-        '''
+        
         update_from_salesforce()
     
 if __name__ == '__main__':

@@ -79,12 +79,25 @@ class DomainSubsector(BaseModel):
         db_table = 'domain_subsector'
 models.append(DomainSubsector)
 
+class Application(BaseModel):
+    app_id = CharField(max_length=255, null=True)
+    app_name = TextField(db_column='app_name', null=True)
+    
+    app_json = JSONField(db_column='app_json', null=True)
+    attributes = HStoreField(null=True)
+    
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='apps')
+    
+    class Meta:
+        db_table = 'application'
+models.append(Application)
+
 class FormDefinition(BaseModel):
     id = PrimaryKeyField(db_column='id')
     xmlns = CharField(max_length=255, null=True)
-    app_id = CharField(max_length=255, null=True)
+    app_id = CharField(max_length=255, null=True) #TODO: fk
     
-    app_name = TextField(db_column='app_name', null=True)
+    app_name = TextField(db_column='app_name', null=True) #TODO: fk
     form_names = HStoreField(db_column='form_names', null=True)
     formdef_json = JSONField(db_column='formdef_json', null=True)
     
@@ -152,12 +165,12 @@ models.append(Visit)
 
 class Form(BaseModel):
     id = PrimaryKeyField(db_column='id')
-    app = CharField(db_column='app_id', max_length=255, null=True)
+    app = CharField(db_column='app_id', max_length=255, null=True) #TODO: this should be an fk
     form = CharField(db_column='form_id', max_length=255)
     time_end = DateTimeField(null=True)
     time_start = DateTimeField(null=True)
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms', on_delete='CASCADE')
-    xmlns = CharField(max_length=255, null=True)
+    xmlns = CharField(max_length=255, null=True) #TODO: add an optional fk to a formdef
     
     app_version = CharField(max_length=255, null=True)
     closed = BooleanField(null=True)
@@ -184,7 +197,7 @@ class Cases(BaseModel):
     date_opened = DateTimeField(null=True)
     
     owner = ForeignKeyField(db_column='owner_id', null=True, rel_model=User, related_name='owned_cases', on_delete='CASCADE')
-    parent = CharField(db_column='parent_id', max_length=255, null=True)
+    parent = CharField(db_column='parent_id', max_length=255, null=True) #TODO: implement related cases
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='user_cases', on_delete='CASCADE')
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='cases')
 

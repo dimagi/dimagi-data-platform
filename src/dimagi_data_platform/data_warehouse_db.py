@@ -92,6 +92,24 @@ class Application(BaseModel):
         db_table = 'application'
 models.append(Application)
 
+class ApplicationSector(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    application = ForeignKeyField(db_column='app_id', null=True, rel_model=Application, related_name='appsectors')
+    sector = ForeignKeyField(db_column='sector_id', null=True, rel_model=Sector, related_name='appsectors')
+
+    class Meta:
+        db_table = 'application_sector'
+models.append(ApplicationSector)
+
+class ApplicationSubsector(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    application = ForeignKeyField(db_column='app_id', null=True, rel_model=Application, related_name='appsubsectors')
+    subsector = ForeignKeyField(db_column='subsector_id', null=True, rel_model=Subsector, related_name='appsubsectors')
+
+    class Meta:
+        db_table = 'application_subsector'
+models.append(ApplicationSubsector)
+
 class FormDefinition(BaseModel):
     id = PrimaryKeyField(db_column='id')
     xmlns = CharField(max_length=255, null=True)

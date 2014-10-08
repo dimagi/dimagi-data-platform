@@ -6,6 +6,8 @@ Created on Jun 8, 2014
 import datetime
 import getpass
 import logging
+import logging.handlers
+import os
 
 from commcare_export.commcare_hq_client import CommCareHqClient
 
@@ -24,14 +26,28 @@ from dimagi_data_platform.loaders import DomainLoader, \
     UserLoader, FormLoader, CasesLoader, \
     VisitLoader, FormDefLoader, WebUserLoader, DeviceLogLoader, CaseEventLoader, \
     SalesforceObjectLoader
-from dimagi_data_platform.utils import get_domains, configure_logger
+from dimagi_data_platform.utils import get_domains
 
 
 logger = logging.getLogger('dimagi_data_platform')
 db = conf.PEEWEE_DB_CON
         
 def setup():
-    configure_logger(logger)
+    logger.setLevel(logging.DEBUG)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    file_handler = logging.handlers.RotatingFileHandler(os.path.join(conf.LOG_FILES_DIR,'data_platform_run.log'),
+                                               maxBytes=500000000,
+                                               backupCount=5,)
+    file_handler.setLevel(logging.DEBUG)
+    root.addHandler(file_handler)
+
     incoming_data_tables.create_missing_tables()
     data_warehouse_db.create_missing_tables()
     
@@ -74,7 +90,6 @@ def update_for_domain(dname, password):
     formdef_extractor = CommCareSlumberFormDefExtractor('v0.5', dname, conf.CC_USER, password)
     
     extracters = [case_extractor,form_extractor,user_extractor,webuser_extractor,formdef_extractor, devicelog_extractor]
-
     logger.info('TIMESTAMP starting commcare export for domain %s' % d.name)
     api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(conf.CC_USER, password)
     

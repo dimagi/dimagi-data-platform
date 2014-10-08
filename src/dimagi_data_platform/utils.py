@@ -8,23 +8,7 @@ import subprocess
 
 from dimagi_data_platform.data_warehouse_db import Domain
 
-
 logger = logging.getLogger(__name__)
-
-def configure_logger(lg):
-    logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%m-%d %H:%M',
-                    filename='/var/tmp/data_platform_run.log',
-                    filemode='w')
-    
-    logger_consol_handler = logging.StreamHandler()
-    logger_consol_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    
-    logger_consol_handler.setFormatter(formatter)
-
-    logging.getLogger('').addHandler(logger_consol_handler)
 
 def get_domains(run_conf_json):
     '''

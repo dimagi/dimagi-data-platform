@@ -6,6 +6,8 @@ Created on Jun 6, 2014
 
 import json
 import logging
+import os
+
 from playhouse.postgres_ext import PostgresqlExtDatabase
 
 
@@ -33,6 +35,10 @@ CC_USER = _json_conf['commcare_export']['username']
 # the config file should specify full paths for these
 INPUT_DIR = _json_conf['directories']['input']
 TMP_FILES_DIR = _json_conf['directories']['tmp_files']
+LOG_FILES_DIR = _json_conf['directories']['log_files']
+for dirc in (INPUT_DIR,TMP_FILES_DIR,LOG_FILES_DIR):
+    if not os.path.exists(dirc):
+        os.makedirs(dirc)
 
 SQLALCHEMY_DB_URL = 'postgresql://%s:%s@%s:%s/%s' % (DB_USER, DB_PASS, DB_HOST, DB_PORT, DB_NAME)
 PEEWEE_DB_CON = PostgresqlExtDatabase(DB_NAME, **{'host': DB_HOST, 'password': DB_PASS, 'user': DB_USER, 'port':DB_PORT})

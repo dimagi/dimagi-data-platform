@@ -25,7 +25,7 @@ from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
 from dimagi_data_platform.loaders import DomainLoader, \
     UserLoader, FormLoader, CasesLoader, \
     VisitLoader, FormDefLoader, WebUserLoader, DeviceLogLoader, CaseEventLoader, \
-    SalesforceObjectLoader
+    SalesforceObjectLoader, ApplicationLoader
 from dimagi_data_platform.utils import get_domains
 
 
@@ -105,6 +105,8 @@ def update_for_domain(dname, password):
     user_loader = UserLoader(dname)
     load_and_cleanup(user_loader,user_extractor)
     
+    app_loader = ApplicationLoader(dname)
+    load_and_cleanup(app_loader,None) # don't clean up yet, formdef_loader uses the same incoming table
     formdef_loader = FormDefLoader(dname)
     load_and_cleanup(formdef_loader,formdef_extractor)
     

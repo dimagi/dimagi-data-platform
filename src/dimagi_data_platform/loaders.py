@@ -15,7 +15,7 @@ from dimagi_data_platform import conf
 from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector, \
      User, Form, CaseEvent, Cases, FormDefinition, \
     Subsector, FormDefinitionSubsector, Visit, DomainSubsector, WebUser, \
-    DeviceLog
+    DeviceLog, Application
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm, IncomingFormDef, IncomingUser, IncomingWebUser, \
@@ -147,6 +147,28 @@ class DomainLoader(Loader):
                 
                 domain.save()
                 
+class ApplicationLoader(Loader):
+    '''
+    loads data to the application table
+    '''
+    _db_warehouse_table_class = Application
+    
+    def __init__(self, domain):
+        self.domain = Domain.get(name=domain)
+        super(ApplicationLoader, self).__init__()
+        
+    def do_load(self):
+        for inc in IncomingFormDef.get_unimported(self.domain.name):
+            if not inc.app_id:
+                continue
+            
+            try:
+                app = Application.get(Application.app_id == inc.app_id, Application.domain == self.domain.id)
+            except Application.DoesNotExist:
+                app = Application(app_id = inc.app_id, domain = self.domain.id)
+            app.app_name = inc.app_name
+            app.save()
+                
 class FormDefLoader(Loader):
     '''
     loads data to the form definition table, plus subsectors
@@ -161,21 +183,25 @@ class FormDefLoader(Loader):
         for row in IncomingFormAnnotation.get_unimported().select().where(IncomingDomainAnnotation.attributes.contains({'Domain name': self.domain.name})):
             attrs = row.attributes
             
-            if not ('Form xmlns' in attrs and 'Application ID' in attrs and 'Domain name' in attrs):
-                logger.warn('Must have Form xmlns, Application ID and Domain name to save form annotation, but we only have %s' % attrs)
+            if not ('Form xmlns' in attrs and 'Domain name' in attrs):
+                logger.warn('Must have Form xmlns and Domain name to save form annotation, but we only have %s' % attrs)
 
             else:
                 xmlns = attrs['Form xmlns']
-                app_id = attrs['Application ID']
+                app_id = attrs['Application ID'] if attrs['Application ID'] else None
                 dname = attrs['Domain name']
                 subsector_names = [k.replace('Subsector_', '') for k, v in attrs.iteritems() if (k.startswith('Subsector_') & (v == 'Yes'))]
                 
                 try:
                     domain = Domain.get(name=dname)
+                    application = Application.get_by_app_id_str(app_id, domain)
                     try:
-                        fd = FormDefinition.get(xmlns=xmlns, app_id=app_id, domain=domain)
+                        if not application:
+                            fd = FormDefinition.get(FormDefinition.xmlns==xmlns, FormDefinition.application>>None, FormDefinition.domain==domain)
+                        else:
+                            fd = FormDefinition.get(FormDefinition.xmlns==xmlns, FormDefinition.application==application, FormDefinition.domain==domain)
                     except FormDefinition.DoesNotExist:
-                        fd = FormDefinition(xmlns=xmlns, app_id=app_id, domain=domain)
+                        fd = FormDefinition(xmlns=xmlns, application=application, domain=domain)
                     
                     fd.attributes = attrs
                     fd.save()
@@ -203,18 +229,21 @@ class FormDefLoader(Loader):
         
     def load_from_API(self):
         for inc in IncomingFormDef.get_unimported(self.domain.name):
-            try:
-                domain = Domain.get(name=inc.domain)
-            except Domain.DoesNotExist:
-                logger.warn('Domain with name %s does not exist, could not add Form Definition ' % (domain))
+            if not inc.form_xmlns:
+                logger.warn('Formdef with no xmlns not added for domain %s ' % (self.domain.name))
                 continue
+            
+            domain = Domain.get(name=inc.domain)
+            application = Application.get_by_app_id_str(inc.app_id, domain)
 
             try:
-                fd = FormDefinition.get(xmlns=inc.form_xmlns, app_id=inc.app_id, domain=domain)
+                if not (inc.app_id):
+                    fd = FormDefinition.get(FormDefinition.xmlns==inc.form_xmlns, FormDefinition.application>>None, FormDefinition.domain==domain)
+                else:
+                    fd = FormDefinition.get(FormDefinition.xmlns==inc.form_xmlns, FormDefinition.application==application, FormDefinition.domain==domain)
             except FormDefinition.DoesNotExist:
-                fd = FormDefinition(xmlns=inc.form_xmlns, app_id=inc.app_id, domain=domain)
+                fd = FormDefinition(xmlns=inc.form_xmlns, application=application, domain=domain)
                 
-            fd.app_name = inc.app_name
             fd.form_names = json.loads(inc.form_names) if inc.form_names else None
             fd.formdef_json = json.loads(inc.formdef_json)
             
@@ -418,7 +447,13 @@ class FormLoader(Loader):
                     closed = (incform.closed == "True")
                     phone = (incform.is_phone_submission == "1.0")
                     
-                    row = {'form':incform.form, 'xmlns':incform.xmlns, 'app':incform.app,
+                    application = Application.get_by_app_id_str(incform.app, self.domain)
+                    application_id = application.id if application else None
+                    
+                    formdef = FormDefinition.get_by_xmlns_and_application(incform.xmlns, application, self.domain)
+                    formdef_id = formdef.id if formdef else None
+                    
+                    row = {'form':incform.form, 'formdef':formdef_id, 'application':application_id,
                            'time_start':start, 'time_end':end, 'received_on':rec,
                            'created':created, 'updated':updated, 'closed':closed,
                            'app_version':incform.app_version, 'is_phone_submission': phone,

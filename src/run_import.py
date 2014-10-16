@@ -171,7 +171,7 @@ def main():
         logger.info('domains for run are: %s' % ','.join(domain_list))
         update_for_domains(domain_list, password)
         
-        update_from_salesforce()
+        #update_from_salesforce()
     
 if __name__ == '__main__':
     main()

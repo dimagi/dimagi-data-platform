@@ -24,6 +24,9 @@ logger = logging.getLogger(__name__)
 
 database = conf.PEEWEE_DB_CON
 
+class EmptyTableException(Exception):
+    pass
+
 class CsvPlainWriter(TableWriter):
     def __init__(self, dir):
         self.dir = dir
@@ -54,6 +57,8 @@ class CsvPlainWriter(TableWriter):
             writer.writerow(csv_headings)
             
             row_dicts = [OrderedDict(zip(table['headings'], row)) for row in table["rows"]]
+            if len(row_dicts) == 0:
+                raise EmptyTableException('Table has no rows')
             
             for row_dict in row_dicts:
                 out = []
@@ -89,7 +94,12 @@ class PgCopyWriter(SqlTableWriter):
         csvfilename = '%s-%s.csv' % (prefix, table['name'])
         
         csv_writer = CsvPlainWriter(csvdir)        
-        csv_writer.write_table(table, csvfilename, db_cols, hstore_col_name)
+        
+        try:
+            csv_writer.write_table(table, csvfilename, db_cols, hstore_col_name)
+        except EmptyTableException:
+            logger.info('pg_copy_writer stopping, no rows to write to csv file')
+            return
         
         csvfile = os.path.join(csvdir, csvfilename)
         with open(csvfile, 'r') as csv_file:

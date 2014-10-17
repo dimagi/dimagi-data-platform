@@ -53,6 +53,7 @@ class CsvPlainWriter(TableWriter):
                     
             if hstore_col_name:
                 csv_headings.append(hstore_col_name)
+            csv_headings.append('imported')
                 
             writer.writerow(csv_headings)
             
@@ -74,6 +75,9 @@ class CsvPlainWriter(TableWriter):
                 if hstore_col_name:
                     out.append(hstore_str)
                 
+                # imported
+                out.append(False)
+                
                 writer.writerow(out)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -87,7 +91,7 @@ class PgCopyWriter(SqlTableWriter):
         super(PgCopyWriter, self).__init__(connection)
     
     def write_table(self, table, db_cols, hstore_col_name):
-        
+        logger.debug('pg_copy_writer starting for project %s, table %s' % (self.project,table['name']))
         prefix = self.project
         
         csvdir = conf.TMP_FILES_DIR
@@ -111,13 +115,12 @@ class PgCopyWriter(SqlTableWriter):
         
         copy_file = open(abspath,'r')
         copy_sql = "COPY %s (%s) FROM STDIN DELIMITER ',' CSV HEADER" % (table['name'], headings)
-        update_imported_sql = "UPDATE %s set imported=FALSE where imported is null" % table['name']
         
+        logger.debug('starting pg_copy')
         # need to use raw psycopg here to copy from stdin because with RDS not allowing admin users, can't copy from a file.
         raw_conn = engine.raw_connection()
         raw_cur = raw_conn.cursor()
         raw_cur.copy_expert(copy_sql, copy_file)
-        raw_cur.execute(update_imported_sql)
         raw_conn.commit()
         raw_cur.close()
         raw_conn.close()

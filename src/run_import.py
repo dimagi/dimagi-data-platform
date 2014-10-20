@@ -127,8 +127,8 @@ def update_for_domain(dname, password):
         caseevent_loader = CaseEventLoader(dname)
         load_and_cleanup(caseevent_loader,form_extractor)
         
-        visit_loader = VisitLoader(dname)
-        load_and_cleanup(visit_loader, None)
+    visit_loader = VisitLoader(dname)
+    load_and_cleanup(visit_loader, None)
         
     device_logs_to_import = IncomingDeviceLog.get_unimported(dname).count()
     if (device_logs_to_import > 0):
@@ -165,14 +165,14 @@ def main():
         password = getpass.getpass()
         
         logger.info('TIMESTAMP updating hq admin data - domains, forms definitions %s' % datetime.datetime.now())
-        update_hq_admin_data()
+        #update_hq_admin_data()
         domain_list = get_domains(conf.RUN_CONF_JSON)
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
         update_for_domains(domain_list, password)
         
-        update_from_salesforce()
+        #update_from_salesforce()
     
 if __name__ == '__main__':
     main()

@@ -46,6 +46,7 @@ def setup():
                                                maxBytes=500000000,
                                                backupCount=5,)
     file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
     root.addHandler(file_handler)
 
     incoming_data_tables.create_missing_tables()

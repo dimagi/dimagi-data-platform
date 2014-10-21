@@ -193,7 +193,8 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
     def _get_query(self):
         # headings need to be lower case and not reserved words for the postgresql copy to work
         form_query = Emit(table=self._get_table_name,
-                    headings=[Literal('form_id'),
+                    headings=[Literal('ccx_id'),
+                              Literal('form_id'),
                               Literal('xmlns'),
                               Literal('app_id'),
                               Literal('domain'),
@@ -212,6 +213,7 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
                     source=Map(source=FlatMap(body=Reference('form..case'),
                                               source=Apply(Reference('api_data'), Literal('form'))),
                                body=List([Reference('id'),
+                              Reference('$.metadata.instanceID'),
                               Reference('$.form.@xmlns'),
                               Reference('$.app_id'),
                               Reference('$.domain'),

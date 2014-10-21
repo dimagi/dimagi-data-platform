@@ -3,6 +3,7 @@ Created on Jun 6, 2014
 
 @author: mel
 '''
+import datetime
 import json
 import logging
 import os
@@ -15,14 +16,16 @@ from pandas.core.common import notnull
 from pandas.io.excel import ExcelFile
 from playhouse.postgres_ext import HStoreField
 from requests.auth import HTTPDigestAuth
+from simple_salesforce.api import Salesforce, SalesforceMalformedRequest
 import slumber
 import sqlalchemy
 
 import conf
-from dimagi_data_platform.data_warehouse_db import Domain, DeviceLog
+from dimagi_data_platform.data_warehouse_db import Domain, DeviceLog, \
+    HQExtractLog
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
     IncomingCases, IncomingUser, IncomingDeviceLog, IncomingWebUser, \
-    IncomingFormDef
+    IncomingFormDef, IncomingSalesforceRecord
 from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 
@@ -70,23 +73,38 @@ class Extractor(object):
         if hstorecols:
             return hstorecols[0]
         
+    def extract(self):
+        self.do_extract()
+        
+    def cleanup(self):
+        self.do_cleanup()
+        
     def do_extract(self):
-        pass
+        raise NotImplementedError("Subclass must implement do_extract")
     
     def do_cleanup(self):
-        pass
+        raise NotImplementedError("Subclass must implement do_cleanup")
 
 class CommCareExportExtractor(Extractor):
     '''
     An extractor that uses commcare-export
     '''
 
-    def __init__(self, incoming_table_class, since, domain):
+    def __init__(self, incoming_table_class, domain, incremental = False):
         '''
         Constructor
         '''
+        # TODO should deal in domain objects only, not domain names
         self.domain = domain
-        self.since = since
+        d = Domain.get(name=self.domain)
+        self.extract_log = HQExtractLog(extractor = self.__class__.__name__, domain = d)
+        self.incremental = incremental
+        
+        try:
+            last_extract_log = HQExtractLog.get_last_extract_log(self.__class__.__name__, d)
+            self.since = last_extract_log.extract_end
+        except HQExtractLog.DoesNotExist:
+            self.since = None
         self._incoming_table_class = incoming_table_class
         
         super(CommCareExportExtractor, self).__init__(self._incoming_table_class)
@@ -97,33 +115,64 @@ class CommCareExportExtractor(Extractor):
     
     def set_api_client(self, api_client):
         self.api_client = api_client
-    
+        
+    def extract_chunk(self, since, until):
+        api_call_start = datetime.datetime.now() # when did the API call start? if until is none, we will get records up to this time
+        try:
+            logger.info("%s doing chunked extract for domain %s, requesting records since %s until %s" 
+                        % (self.__class__.__name__, self.domain, since if since else 'forever', until if until else 'forever'))
+       
+            writer = PgCopyWriter(self.engine.connect(), self.api_client.project)
+            
+            env = BuiltInEnv() | CommCareHqEnv(self.api_client, since, until) | JsonPathEnv({})
+            result = self._get_query.eval(env)
+            
+            if (self._get_table_name in [t['name'] for t in env.emitted_tables()]):
+                with writer:
+                    for table in env.emitted_tables():
+                        if table['name'] == self._get_table_name:
+                            writer.write_table(table, self._get_attribute_db_cols, self._get_hstore_db_col)
+            else:
+                logger.warn('no table emitted with name %s' % self._get_table_name)
+            
+            self.extract_log.extract_end = until if until else api_call_start
+        
+        except:
+            raise
+  
+        finally:
+            if self.extract_log.extract_end:
+                self.extract_log.save()
+        
     def do_extract(self):
         
         if not self.api_client:
             raise Exception('CommCareExportExtractor needs an initialized API client')
-        
         if not self.engine:
             raise Exception('CommCareExportExtractor needs a database connection engine')
         
-        writer = PgCopyWriter(self.engine.connect(), self.api_client.project)
+        self.extract_log.extract_start = self.since
         
-        env = BuiltInEnv() | CommCareHqEnv(self.api_client, self.since) | JsonPathEnv({})
-        result = self._get_query.eval(env)
-        
-        if (self._get_table_name in [t['name'] for t in env.emitted_tables()]):
-            with writer:
-                for table in env.emitted_tables():
-                    if table['name'] == self._get_table_name:
-                        writer.write_table(table, self._get_attribute_db_cols, self._get_hstore_db_col)
-              
-        else:
-            logger.warn('no table emitted with name %s' % self._get_table_name)
+        if self.incremental:
+            until = (self.since + datetime.timedelta(days=30)) if self.since else datetime.datetime.strptime('01/01/2010', '%m/%d/%Y')
+            since = self.since
             
+            while until < datetime.datetime.now():
+                self.extract_chunk(since, until)
+                since = until
+                until = since + datetime.timedelta(days=30)
+           
+            self.extract_chunk(since, None) # get the last chunk, until now
+        
+        else:
+            self.extract_chunk(self.since, None)
+        
+        
     def do_cleanup(self):
         update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.domain == self.domain) 
                                                                           & ((self._incoming_table_class.imported == False) | (self._incoming_table_class.imported >> None)))
         rows = update_q.execute()
+        
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
             
 class CommCareExportFormExtractor(CommCareExportExtractor):
@@ -134,11 +183,11 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingForm
     
-    def __init__(self, since, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''
-        super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, domain)
     
     @property
     def _get_query(self):
@@ -188,11 +237,11 @@ class CommCareExportCaseExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingCases
     
-    def __init__(self, since, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''  
-        super(CommCareExportCaseExtractor, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportCaseExtractor, self).__init__(self._incoming_table_class, domain)
     
     @property
     def _get_query(self):
@@ -230,11 +279,11 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingUser
     
-    def __init__(self, since, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''  
-        super(CommCareExportUserExtractor, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportUserExtractor, self).__init__(self._incoming_table_class, domain)
     
     @property
     def _get_query(self):
@@ -270,11 +319,11 @@ class CommCareExportWebUserExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingWebUser
     
-    def __init__(self, since, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''  
-        super(CommCareExportWebUserExtractor, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportWebUserExtractor, self).__init__(self._incoming_table_class, domain)
     
     @property
     def _get_query(self):
@@ -312,7 +361,7 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingDeviceLog
     
-    def __init__(self, since, domain):
+    def __init__(self, domain):
         '''
         Constructor
         '''  
@@ -322,7 +371,7 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
         if DeviceLog.select().where(DeviceLog.domain == d).count() == 0:
             since = None
             
-        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, since, domain)
+        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, domain, incremental=True)
 
     @property
     def _get_query(self):
@@ -454,6 +503,62 @@ class ExcelExtractor(Extractor):
         delete_q = self._incoming_table_class.delete()
         rows = delete_q.execute()
         logger.info('Deleted %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
+        
+class SalesforceExtractor(Extractor):
+    
+    _incoming_table_class = IncomingSalesforceRecord
+    
+    def __init__(self, username, password, token):
+        '''
+        Constructor
+        '''
+        self.api = Salesforce(username=username, password=password, security_token=token)
+        super(SalesforceExtractor, self).__init__(self._incoming_table_class)
+    
+    def do_extract(self):
+        res = self.api.describe()
+        obj_names = [obj['name'] for obj in res['sobjects']]
+        obj_fields = dict()
+        
+        for obj in obj_names:
+            api_method_call =  getattr(self.api, obj)
+            try:
+                obj_meta = api_method_call.describe()
+                # get field names for everything except the content blobs
+                # if there's a blob in the record queries will return only one at a time i.e. one API call per record
+                field_names = [field['name'] for field in obj_meta['fields'] if field['type'] not in ('base64')]
+                obj_fields[obj] = field_names
+                
+            except SalesforceMalformedRequest, m:
+                logger.warn('Got SalesforceMalformedRequest when querying metadata for object %s' % obj)
+                logger.warn(str(m))
+                
+        for obj in obj_fields.keys():
+            fieldstr = ','.join(obj_fields[obj])
+            querystr = 'SELECT %s FROM %s' % (fieldstr,obj)
+            logger.info('Executing Salesforce query %s' % querystr)
+            records = []
+            try:
+                obj_res = self.api.query(querystr)
+                if 'records' in obj_res:
+                    records.extend(obj_res['records'])
+                while 'done' in obj_res and not obj_res['done']:
+                    obj_res = self.api.query_more(obj_res['nextRecordsUrl'], True)
+                    if 'records' in obj_res:
+                        records.extend(obj_res['records'])
+                
+                logger.info('%d results of type %s' % (len(records),obj))
+                for rec in records:
+                    IncomingSalesforceRecord.create(sf_id=id,object_type=obj,record=json.dumps(rec))
+                    
+            except SalesforceMalformedRequest, m:
+                logger.warn('Got SalesforceMalformedRequest when trying to retrieve all fields for object %s' % obj)
+                logger.warn(str(m))
 
+    
+    def do_cleanup(self):
+        delete_q = self._incoming_table_class.delete()
+        rows = delete_q.execute()
+        logger.info('Deleted %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
 
     

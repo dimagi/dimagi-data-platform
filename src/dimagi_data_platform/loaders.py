@@ -7,16 +7,19 @@ import datetime
 import json
 import logging
 
+from pandas.core.frame import DataFrame
 from peewee import prefetch
+import sqlalchemy
 
+from dimagi_data_platform import conf
 from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector, \
      User, Form, CaseEvent, Cases, FormDefinition, \
     Subsector, FormDefinitionSubsector, Visit, DomainSubsector, WebUser, \
-    DeviceLog
+    DeviceLog, Application
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm, IncomingFormDef, IncomingUser, IncomingWebUser, \
-    IncomingDeviceLog
+    IncomingDeviceLog, IncomingSalesforceRecord
 from dimagi_data_platform.utils import break_into_chunks
 
 
@@ -31,20 +34,24 @@ class Loader(object):
     
     def __init__(self):
         super(Loader, self).__init__()
-    
         pass
     
-    def insert_chunked(self, l):
+    def do_load(self):
+        pass
+    
+    def insert_chunked(self, l, db_table_class=None):
         
-        if not self._db_warehouse_table_class:
-            logger.error('No data warehouse table class is defined, cannot insert chunked list')
+        if (not db_table_class and not self._db_warehouse_table_class):
+            logger.error('No data warehouse table class is defined and none supplies, cannot insert chunked list')
         else:
+            if db_table_class is None:
+                db_table_class = self._db_warehouse_table_class
             chunks = break_into_chunks(l, 5000)
             count = 0
             for chunk in chunks:
                 count = count + 1
                 logger.info('inserting chunk %d of %d' % (count, len(chunks)))
-                self._db_warehouse_table_class.insert_many(chunk).execute()
+                db_table_class.insert_many(chunk).execute()
     
 
 class DomainLoader(Loader):
@@ -119,6 +126,11 @@ class DomainLoader(Loader):
                 domain.services = attrs['Services'] if 'Services' in attrs else None
                 domain.project_state = attrs['Project State'] if 'Project State' in attrs else None
                 domain.business_unit = attrs['Business unit'] if 'Business unit' in attrs else None
+                if 'Test Project?' in attrs:
+                    domain.test = (attrs['Test Project?'].lower() == "true")
+                if 'Active?' in attrs:
+                    domain.active = (attrs['Active?'].lower() == "true")
+                    
                 domain.attributes = attrs
                 
                 sector_name_hq = [attrs["Sector"]] if "Sector" in attrs else []
@@ -134,7 +146,28 @@ class DomainLoader(Loader):
                 self.update_sectors(domain, sector_names, subsector_names)
                 
                 domain.save()
-
+                
+class ApplicationLoader(Loader):
+    '''
+    loads data to the application table
+    '''
+    _db_warehouse_table_class = Application
+    
+    def __init__(self, domain):
+        self.domain = Domain.get(name=domain)
+        super(ApplicationLoader, self).__init__()
+        
+    def do_load(self):
+        for inc in IncomingFormDef.get_unimported(self.domain.name):
+            if not inc.app_id:
+                continue
+            
+            try:
+                app = Application.get(Application.app_id == inc.app_id, Application.domain == self.domain.id)
+            except Application.DoesNotExist:
+                app = Application(app_id = inc.app_id, domain = self.domain.id)
+            app.app_name = inc.app_name
+            app.save()
                 
 class FormDefLoader(Loader):
     '''
@@ -150,21 +183,25 @@ class FormDefLoader(Loader):
         for row in IncomingFormAnnotation.get_unimported().select().where(IncomingDomainAnnotation.attributes.contains({'Domain name': self.domain.name})):
             attrs = row.attributes
             
-            if not ('Form xmlns' in attrs and 'Application ID' in attrs and 'Domain name' in attrs):
-                logger.warn('Must have Form xmlns, Application ID and Domain name to save form annotation, but we only have %s' % attrs)
+            if not ('Form xmlns' in attrs and 'Domain name' in attrs):
+                logger.warn('Must have Form xmlns and Domain name to save form annotation, but we only have %s' % attrs)
 
             else:
                 xmlns = attrs['Form xmlns']
-                app_id = attrs['Application ID']
+                app_id = attrs['Application ID'] if attrs['Application ID'] else None
                 dname = attrs['Domain name']
                 subsector_names = [k.replace('Subsector_', '') for k, v in attrs.iteritems() if (k.startswith('Subsector_') & (v == 'Yes'))]
                 
                 try:
                     domain = Domain.get(name=dname)
+                    application = Application.get_by_app_id_str(app_id, domain)
                     try:
-                        fd = FormDefinition.get(xmlns=xmlns, app_id=app_id, domain=domain)
+                        if not application:
+                            fd = FormDefinition.get(FormDefinition.xmlns==xmlns, FormDefinition.application>>None, FormDefinition.domain==domain)
+                        else:
+                            fd = FormDefinition.get(FormDefinition.xmlns==xmlns, FormDefinition.application==application, FormDefinition.domain==domain)
                     except FormDefinition.DoesNotExist:
-                        fd = FormDefinition(xmlns=xmlns, app_id=app_id, domain=domain)
+                        fd = FormDefinition(xmlns=xmlns, application=application, domain=domain)
                     
                     fd.attributes = attrs
                     fd.save()
@@ -192,18 +229,21 @@ class FormDefLoader(Loader):
         
     def load_from_API(self):
         for inc in IncomingFormDef.get_unimported(self.domain.name):
-            try:
-                domain = Domain.get(name=inc.domain)
-            except Domain.DoesNotExist:
-                logger.warn('Domain with name %s does not exist, could not add Form Definition ' % (domain))
+            if not inc.form_xmlns:
+                logger.warn('Formdef with no xmlns not added for domain %s ' % (self.domain.name))
                 continue
+            
+            domain = Domain.get(name=inc.domain)
+            application = Application.get_by_app_id_str(inc.app_id, domain)
 
             try:
-                fd = FormDefinition.get(xmlns=inc.form_xmlns, app_id=inc.app_id, domain=domain)
+                if not (inc.app_id):
+                    fd = FormDefinition.get(FormDefinition.xmlns==inc.form_xmlns, FormDefinition.application>>None, FormDefinition.domain==domain)
+                else:
+                    fd = FormDefinition.get(FormDefinition.xmlns==inc.form_xmlns, FormDefinition.application==application, FormDefinition.domain==domain)
             except FormDefinition.DoesNotExist:
-                fd = FormDefinition(xmlns=inc.form_xmlns, app_id=inc.app_id, domain=domain)
+                fd = FormDefinition(xmlns=inc.form_xmlns, application=application, domain=domain)
                 
-            fd.app_name = inc.app_name
             fd.form_names = json.loads(inc.form_names) if inc.form_names else None
             fd.formdef_json = json.loads(inc.formdef_json)
             
@@ -381,7 +421,7 @@ class FormLoader(Loader):
         self.domain = Domain.get(name=domain)
         super(FormLoader, self).__init__()
         
-    def do_load(self):
+    def load_forms(self):
         logger.info('TIMESTAMP starting form table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         incform_q = IncomingForm.get_unimported(self.domain.name)
         logger.info('Incoming form table has %d records not imported' % incform_q.count())
@@ -407,7 +447,13 @@ class FormLoader(Loader):
                     closed = (incform.closed == "True")
                     phone = (incform.is_phone_submission == "1.0")
                     
-                    row = {'form':incform.form, 'xmlns':incform.xmlns, 'app':incform.app,
+                    application = Application.get_by_app_id_str(incform.app, self.domain)
+                    application_id = application.id if application else None
+                    
+                    formdef = FormDefinition.get_by_xmlns_and_application(incform.xmlns, application, self.domain)
+                    formdef_id = formdef.id if formdef else None
+                    
+                    row = {'form':incform.form, 'formdef':formdef_id, 'application':application_id,
                            'time_start':start, 'time_end':end, 'received_on':rec,
                            'created':created, 'updated':updated, 'closed':closed,
                            'app_version':incform.app_version, 'is_phone_submission': phone,
@@ -422,19 +468,17 @@ class FormLoader(Loader):
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
             logger.info("inserting %d forms for domain %s" % (len(deduped), self.domain.name))
             self.insert_chunked(deduped)
-
-
+        
+    def do_load(self):
+        self.load_forms()
+        
 class CaseEventLoader(Loader):
     '''
-    loads data to the case event table from incoming forms
+    loads data to the caseevent table form incoming forms
     '''
-    
     _db_warehouse_table_class = CaseEvent
-
+    
     def __init__(self, domain):
-        '''
-        Constructor
-        '''
         self.domain = Domain.get(name=domain)
         super(CaseEventLoader, self).__init__()
         
@@ -603,10 +647,10 @@ class DeviceLogLoader(Loader):
             if inc.api_id not in existing_log_ids:
                 try:
                     log_date = datetime.datetime.strptime(inc.log_date, '%Y-%m-%dT%H:%M:%S') if inc.log_date else None
-                except ValueError, v: # this is for log entries with decimal seconds 
+                except ValueError, v:  # this is for log entries with decimal seconds 
                     # see http://stackoverflow.com/questions/5045210/how-to-remove-unconverted-data-from-a-python-datetime-object
                     if len(v.args) > 0 and v.args[0].startswith('unconverted data remains: '):
-                        stripped_date = inc.log_date[:-(len(v.args[0])-26)]
+                        stripped_date = inc.log_date[:-(len(v.args[0]) - 26)]
                         log_date = datetime.datetime.strptime(stripped_date, '%Y-%m-%dT%H:%M:%S')
                     else:
                         raise v
@@ -617,20 +661,52 @@ class DeviceLogLoader(Loader):
                     else:
                         user_id = User.create(user=inc.user_id)
                 else:
-                    user_id=None
+                    user_id = None
                         
-                row = {'api_id':inc.api_id, 'domain':self.domain.id,'app_version':inc.app_version,
-                       'log_date':log_date,'device_id':inc.device_id, 'form':inc.xform_id,
-                       'i':inc.i,'msg':inc.msg, 'resource_uri':inc.resource_uri,'log_type':inc.log_type, 'user':user_id}
+                row = {'api_id':inc.api_id, 'domain':self.domain.id, 'app_version':inc.app_version,
+                       'log_date':log_date, 'device_id':inc.device_id, 'form':inc.xform_id,
+                       'i':inc.i, 'msg':inc.msg, 'resource_uri':inc.resource_uri, 'log_type':inc.log_type, 'user':user_id}
                 insert_dicts.append(row)
     
         if insert_dicts:
-            logger.info("inserting %d device log entries for domain %s" % (len(insert_dicts), self.domain.name))
-            self.insert_chunked(insert_dicts)
+            deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
+            logger.info("inserting %d device log entries for domain %s" % (len(deduped), self.domain.name))
+            self.insert_chunked(deduped)
                 
 
             
     def do_load(self):
         logger.info('TIMESTAMP starting device log table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         self.load_from_API()
+        
+class SalesforceObjectLoader(Loader):
+    
+    def __init__(self):
+        '''
+        Constructor
+        '''
+        self.engine = sqlalchemy.create_engine(conf.SQLALCHEMY_DB_URL)
+        super(SalesforceObjectLoader, self).__init__()
+    
+    def do_load(self):
+        all_unimported = IncomingSalesforceRecord.get_unimported()
+        object_types = all_unimported.select(IncomingSalesforceRecord.object_type).distinct()
+        
+        for obj in object_types:
+            unimported_recs = all_unimported.select().where(IncomingSalesforceRecord.object_type==obj.object_type)
+            unimported_dicts = [json.loads(rec.record) for rec in unimported_recs]
+            for d in unimported_dicts:
+                d['url'] = d['attributes']['url']
+                del d['attributes']
+                
+                for k,v in d.iteritems():
+                    if isinstance(v, dict):
+                        d[k] = json.dumps(v)
+                        
+            df = DataFrame(unimported_dicts)
+            df.columns = [colname.lower() for colname in df.columns]
+            table_name = 'sf_%s' % (obj.object_type.lower())
+            logger.info('Writing records for Salesforce object %s to db table %s' % (obj.object_type,table_name))
+            df.to_sql(table_name, self.engine, flavor='postgresql', if_exists='replace', index=False, index_label=None)
+            
             

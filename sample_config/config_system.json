@@ -25,6 +25,12 @@
         "commcare_export": 
         {
             "username": "commcare-username@email.com"
+        },
+        "salesforce":
+        {
+        	"username": "myusername",
+        	"password": "mypassword",
+        	"token": "mysecuritytoken"
         }
     }
 }

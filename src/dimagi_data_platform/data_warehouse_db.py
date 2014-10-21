@@ -214,9 +214,7 @@ class Form(BaseModel):
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms', on_delete='CASCADE')
     
     app_version = CharField(max_length=255, null=True)
-    closed = BooleanField(null=True)
-    created = BooleanField(null=True)
-    updated = BooleanField(null=True)
+ 
     device = CharField(db_column='device_id', max_length=255, null=True)
     is_phone_submission = BooleanField(null=True)
     received_on = DateTimeField(null=True)
@@ -250,6 +248,9 @@ models.append(Cases)
         
 class CaseEvent(BaseModel):
     id = PrimaryKeyField(db_column='id')
+    closed = BooleanField(null=True)
+    created = BooleanField(null=True)
+    updated = BooleanField(null=True)
     case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='caseevents', on_delete='CASCADE')
     form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, related_name='caseevents', on_delete='CASCADE')
 

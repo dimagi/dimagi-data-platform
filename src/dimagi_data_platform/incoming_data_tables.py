@@ -88,6 +88,7 @@ class IncomingForm(BaseDomainLinkedModel):
     closed = CharField(max_length=255, null=True)
     created = CharField(max_length=255, null=True)
     device = CharField(db_column='device_id', max_length=255, null=True)
+    ccx_id = CharField(db_column='ccx_id', null=True)
     
     form = CharField(db_column='form_id', max_length=255, null=True)
     is_phone_submission = CharField(max_length=255, null=True)

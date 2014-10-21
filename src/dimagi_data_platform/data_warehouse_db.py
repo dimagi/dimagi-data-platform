@@ -88,22 +88,64 @@ class Application(BaseModel):
     
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='apps')
     
+    @staticmethod
+    def get_by_app_id_str(app_id_str, domain):
+        if not app_id_str:
+            return None
+        else:
+            try:
+                app = Application.get(Application.app_id==app_id_str, Application.domain==domain)
+            except Application.DoesNotExist:
+                app = None
+        return app
+    
     class Meta:
         db_table = 'application'
 models.append(Application)
 
+class ApplicationSector(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    application = ForeignKeyField(db_column='app_id', null=True, rel_model=Application, related_name='appsectors')
+    sector = ForeignKeyField(db_column='sector_id', null=True, rel_model=Sector, related_name='appsectors')
+
+    class Meta:
+        db_table = 'application_sector'
+models.append(ApplicationSector)
+
+class ApplicationSubsector(BaseModel):
+    id = PrimaryKeyField(db_column='id')
+    application = ForeignKeyField(db_column='app_id', null=True, rel_model=Application, related_name='appsubsectors')
+    subsector = ForeignKeyField(db_column='subsector_id', null=True, rel_model=Subsector, related_name='appsubsectors')
+
+    class Meta:
+        db_table = 'application_subsector'
+models.append(ApplicationSubsector)
+
 class FormDefinition(BaseModel):
     id = PrimaryKeyField(db_column='id')
     xmlns = CharField(max_length=255, null=True)
-    app_id = CharField(max_length=255, null=True) #TODO: fk
-    
-    app_name = TextField(db_column='app_name', null=True) #TODO: fk
+
     form_names = HStoreField(db_column='form_names', null=True)
     formdef_json = JSONField(db_column='formdef_json', null=True)
     
     attributes = HStoreField(null=True)
+    application = ForeignKeyField(db_column='application_id', null=True, rel_model=Application, related_name='formdefs')
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='formdefs')
     sector = ForeignKeyField(db_column='sector_id',  rel_model=Sector, related_name='formdefs', null=True)
+    
+    @staticmethod
+    def get_by_xmlns_and_application(xmlns,application, domain):
+        if not xmlns:
+            return None
+        else:
+            try:
+                if not application:
+                    fd = FormDefinition.get(FormDefinition.xmlns==xmlns,FormDefinition.application>>None, FormDefinition.domain==domain)
+                else:
+                    fd = FormDefinition.get(FormDefinition.xmlns==xmlns,FormDefinition.application==application, FormDefinition.domain==domain)
+            except FormDefinition.DoesNotExist:
+                fd = None
+        return fd
 
     class Meta:
         db_table = 'formdef'
@@ -165,12 +207,11 @@ models.append(Visit)
 
 class Form(BaseModel):
     id = PrimaryKeyField(db_column='id')
-    app = CharField(db_column='app_id', max_length=255, null=True) #TODO: this should be an fk
+
     form = CharField(db_column='form_id', max_length=255)
     time_end = DateTimeField(null=True)
     time_start = DateTimeField(null=True)
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='forms', on_delete='CASCADE')
-    xmlns = CharField(max_length=255, null=True) #TODO: add an optional fk to a formdef
     
     app_version = CharField(max_length=255, null=True)
     closed = BooleanField(null=True)
@@ -180,6 +221,8 @@ class Form(BaseModel):
     is_phone_submission = BooleanField(null=True)
     received_on = DateTimeField(null=True)
     
+    application = ForeignKeyField(db_column='application_id', null=True, rel_model=Application, related_name='forms', on_delete='SET NULL')
+    formdef = ForeignKeyField(db_column='formdef_id', null=True, rel_model=FormDefinition, related_name='forms', on_delete='SET NULL')
     visit = ForeignKeyField(db_column='visit_id', null=True, rel_model=Visit, related_name='forms', on_delete='SET NULL')
     domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='forms')
 

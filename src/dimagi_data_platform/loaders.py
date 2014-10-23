@@ -601,7 +601,8 @@ class VisitLoader(Loader):
                     # parents of cases updated in this form
                     form_case_parents = [caseevent_parent_dict[cec.id] for cec in case_events if cec.id in caseevent_parent_dict]
                     
-                    if (prev_visited_forms and (prev_visited_forms[len(prev_visited_forms)-1].time_end < (frm.time_end - timedelta(hours=12)))):
+                    # if there is longer than 12 hours between the end time of the previous form and the start time of this one, don't add to visit
+                    if (prev_visited_forms and (prev_visited_forms[len(prev_visited_forms)-1].time_end < (frm.time_start - timedelta(hours=12)))):
                         add_to_previous = False
                     
                     # if all cases in this form are the same as all cases previously visited, add this form to the visit
@@ -629,7 +630,8 @@ class VisitLoader(Loader):
                     else:
                         add_to_previous = False
             
-                    # otherwise save the previous visit and create new lists of forms and cases for a new visit
+                    # if we aren't adding this form to the previous visit save the previous visit
+                    # create new lists of forms and cases for a new visit
                     if not add_to_previous:
                         if prev_visited_forms:
                             previous_visit = self.create_visit(usr, prev_visited_forms)

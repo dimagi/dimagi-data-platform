@@ -30,7 +30,7 @@ def main():
         setup()
         
         extracted_domain_ids = HQExtractLog.select(HQExtractLog.domain)
-        domain_list = Domain.select().where(Domain.id << extracted_domain_ids)
+        domain_list = Domain.select().where((Domain.id << extracted_domain_ids)&(Domain.name == 'tulasalud'))
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.now())
         logger.info('domains for run are: %s' % ','.join([d.name for d in domain_list]))

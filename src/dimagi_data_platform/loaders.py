@@ -536,7 +536,7 @@ class VisitLoader(Loader):
         '''
         self.domain = Domain.get(name=domain)
         super(VisitLoader, self).__init__()
-        
+         
     def delete_most_recent(self, user):
         vq = Visit.select().where(Visit.user == user).order_by(Visit.time_start.desc()).limit(1)
         if vq.count() > 0:
@@ -660,9 +660,10 @@ class DeviceLogLoader(Loader):
         super(DeviceLogLoader, self).__init__()
     
     def load_from_API(self):
-        insert_dicts = []
-        user_id_q = self.domain.users.select()
-        user_id_dict = dict([(u.user, u.id) for u in user_id_q])
+        user_q = self.domain.users.select()
+        user_id_dict = dict([(u.user, u.id) for u in user_q])
+    
+        user_username_dict = dict([((u.username.split('@')[0]), u.id) for u in user_q if (u.username and '@' in u.username)])
         
         existing_cur = DeviceLog._meta.database.execute_sql('select api_id from device_log '
                                                             'where device_log.domain_id = %d' % self.domain.id)
@@ -688,6 +689,8 @@ class DeviceLogLoader(Loader):
                 if (inc.user_id):
                     if inc.user_id in user_id_dict:
                         user_id = user_id_dict[inc.user_id]
+                    elif inc.username and inc.username in user_username_dict:
+                        
                     else:
                         user_id = User.create(user=inc.user_id)
                 else:

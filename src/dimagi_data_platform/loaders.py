@@ -3,6 +3,7 @@ Created on Jun 17, 2014
 
 @author: mel
 '''
+from datetime import timedelta
 import datetime
 import json
 import logging
@@ -535,7 +536,7 @@ class VisitLoader(Loader):
         '''
         self.domain = Domain.get(name=domain)
         super(VisitLoader, self).__init__()
-        
+         
     def delete_most_recent(self, user):
         vq = Visit.select().where(Visit.user == user).order_by(Visit.time_start.desc()).limit(1)
         if vq.count() > 0:
@@ -581,8 +582,12 @@ class VisitLoader(Loader):
             
             # forms already in visit
             prev_visited_forms = []
-            # cases and parents of cases in forms already in visit
+            # cases already in visit
             prev_visited_case_ids = []
+            # parents of cases already in visit
+            parents_of_prev_visited_cases = []
+            # cases in the last form
+            last_form_case_ids = []
             
             forms = usr.forms.select().where(~(Form.time_end >> None) & ~(Form.time_start >> None) & (Form.visit >> None)).order_by(Form.time_start)
             ces = CaseEvent.select()
@@ -596,22 +601,44 @@ class VisitLoader(Loader):
                     # parents of cases updated in this form
                     form_case_parents = [caseevent_parent_dict[cec.id] for cec in case_events if cec.id in caseevent_parent_dict]
                     
-                    # if cases in this form have parents or are parents of cases already in this visit, add this form to the visit
-                    if len(set(form_case_ids) & set(prev_visited_case_ids)) > 0:
-                        prev_visited_case_ids = prev_visited_case_ids + form_case_ids + form_case_parents
-                        prev_visited_forms.append(frm)
+                    # if there is longer than 12 hours between the end time of the previous form and the start time of this one, don't add to visit
+                    if (prev_visited_forms and (prev_visited_forms[len(prev_visited_forms)-1].time_end < (frm.time_start - timedelta(hours=12)))):
+                        add_to_previous = False
                     
-                    # if parents of cases in this form have parents or are parents of cases already in this visit, add this form to the visit
-                    elif len(set(prev_visited_case_ids) & set(form_case_parents)) > 0:
-                        prev_visited_case_ids = prev_visited_case_ids + form_case_ids + form_case_parents
+                    # if all cases in this form are the same as all cases previously visited, add this form to the visit
+                    elif set(form_case_ids) == set(last_form_case_ids):
                         prev_visited_forms.append(frm)
-            
-                    # otherwise save the previous visit and create new lists of forms and cases for a new visit
+                        parents_of_prev_visited_cases.extend(form_case_parents)
+                        add_to_previous = True
+                        
+                    # if cases in this form have parents already in this visit, add this form to the visit
+                    elif len(set(form_case_ids) & set(parents_of_prev_visited_cases)) > 0:
+                        prev_visited_forms.append(frm)
+                        prev_visited_case_ids.extend(form_case_ids)
+                        parents_of_prev_visited_cases.extend(form_case_parents)
+                        last_form_case_ids = form_case_ids
+                        add_to_previous = True
+                    
+                    # if cases in this form are parents of cases already in this visit, add this form to the visit
+                    elif len(set(prev_visited_case_ids) & set(form_case_parents)) > 0:
+                        prev_visited_forms.append(frm)
+                        prev_visited_case_ids.extend(form_case_ids)
+                        parents_of_prev_visited_cases.extend(form_case_parents)
+                        last_form_case_ids = form_case_ids
+                        add_to_previous = True
+                        
                     else:
+                        add_to_previous = False
+            
+                    # if we aren't adding this form to the previous visit save the previous visit
+                    # create new lists of forms and cases for a new visit
+                    if not add_to_previous:
                         if prev_visited_forms:
                             previous_visit = self.create_visit(usr, prev_visited_forms)
                             
-                        prev_visited_case_ids = form_case_ids + form_case_parents
+                        prev_visited_case_ids = form_case_ids
+                        parents_of_prev_visited_cases = form_case_parents
+                        last_form_case_ids = form_case_ids
                         prev_visited_forms = [frm]
             
             # save the last visit for this user
@@ -633,9 +660,10 @@ class DeviceLogLoader(Loader):
         super(DeviceLogLoader, self).__init__()
     
     def load_from_API(self):
-        insert_dicts = []
-        user_id_q = self.domain.users.select()
-        user_id_dict = dict([(u.user, u.id) for u in user_id_q])
+        user_q = self.domain.users.select()
+        user_id_dict = dict([(u.user, u.id) for u in user_q])
+    
+        user_username_dict = dict([((u.username.split('@')[0]), u.id) for u in user_q if (u.username and '@' in u.username)])
         
         existing_cur = DeviceLog._meta.database.execute_sql('select api_id from device_log '
                                                             'where device_log.domain_id = %d' % self.domain.id)
@@ -661,6 +689,8 @@ class DeviceLogLoader(Loader):
                 if (inc.user_id):
                     if inc.user_id in user_id_dict:
                         user_id = user_id_dict[inc.user_id]
+                    elif inc.username and inc.username in user_username_dict:
+                        user_id = user_id_dict[inc.username]
                     else:
                         user_id = User.create(user=inc.user_id)
                 else:

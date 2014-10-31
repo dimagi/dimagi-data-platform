@@ -692,7 +692,7 @@ class DeviceLogLoader(Loader):
                     elif inc.username and inc.username in user_username_dict:
                         user_id = user_id_dict[inc.username]
                     else:
-                        user_id = User.create(user=inc.user_id)
+                        user_id = User.create(user=inc.user_id, username=inc.username, domain=self.domain)
                 else:
                     user_id = None
                         

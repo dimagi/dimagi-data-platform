@@ -90,7 +90,7 @@ class CommCareExportExtractor(Extractor):
     An extractor that uses commcare-export
     '''
 
-    def __init__(self, incoming_table_class, domain, incremental = False):
+    def __init__(self, incoming_table_class, domain, chunked_by_date = False, incremental = True):
         '''
         Constructor
         '''
@@ -98,13 +98,16 @@ class CommCareExportExtractor(Extractor):
         self.domain = domain
         d = Domain.get(name=self.domain)
         self.extract_log = HQExtractLog(extractor = self.__class__.__name__, domain = d)
-        self.incremental = incremental
-        
-        try:
-            last_extract_log = HQExtractLog.get_last_extract_log(self.__class__.__name__, d)
-            self.since = last_extract_log.extract_end
-        except HQExtractLog.DoesNotExist:
+        self.chunked_by_date = chunked_by_date
+
+        if not incremental:
             self.since = None
+        else:
+            try:
+                last_extract_log = HQExtractLog.get_last_extract_log(self.__class__.__name__, d)
+                self.since = last_extract_log.extract_end
+            except HQExtractLog.DoesNotExist:
+                self.since = None
         self._incoming_table_class = incoming_table_class
         
         super(CommCareExportExtractor, self).__init__(self._incoming_table_class)
@@ -117,7 +120,7 @@ class CommCareExportExtractor(Extractor):
         self.api_client = api_client
         
     def extract_chunk(self, since, until):
-        api_call_start = datetime.datetime.now() # when did the API call start? if until is none, we will get records up to this time
+        api_call_start = datetime.datetime.now() # when did the API call start? if until is none, we can assume we fetched records up to this time
         try:
             logger.info("%s doing chunked extract for domain %s, requesting records since %s until %s" 
                         % (self.__class__.__name__, self.domain, since if since else 'forever', until if until else 'forever'))
@@ -153,7 +156,7 @@ class CommCareExportExtractor(Extractor):
         
         self.extract_log.extract_start = self.since
         
-        if self.incremental:
+        if self.chunked_by_date:
             until = (self.since + datetime.timedelta(days=30)) if self.since else datetime.datetime.strptime('01/01/2010', '%m/%d/%Y')
             since = self.since
             
@@ -183,11 +186,11 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingForm
     
-    def __init__(self, domain):
+    def __init__(self, domain, incremental=True):
         '''
         Constructor
         '''
-        super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, domain)
+        super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, domain, incremental=incremental)
     
     @property
     def _get_query(self):
@@ -239,11 +242,11 @@ class CommCareExportCaseExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingCases
     
-    def __init__(self, domain):
+    def __init__(self, domain, incremental=True):
         '''
         Constructor
-        '''  
-        super(CommCareExportCaseExtractor, self).__init__(self._incoming_table_class, domain)
+        '''
+        super(CommCareExportCaseExtractor, self).__init__(self._incoming_table_class, domain, incremental=incremental)
     
     @property
     def _get_query(self):
@@ -371,9 +374,9 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
         # check if we have any existing device logs in the db for this domain. If not, try to import everything, ignoring the since param
         d = Domain.get(name=domain)
         if DeviceLog.select().where(DeviceLog.domain == d).count() == 0:
-            since = None
+            self.since = None
             
-        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, domain, incremental=True)
+        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, domain, chunked_by_date=True)
 
     @property
     def _get_query(self):

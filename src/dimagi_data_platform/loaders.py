@@ -375,34 +375,43 @@ class CasesLoader(Loader):
         user_id_q = self.domain.users.select()
         user_id_dict = dict([(u.user, u) for u in user_id_q])
         
-        cases_cur = Cases._meta.database.execute_sql('select case_id from cases '
+        cases_cur = Cases._meta.database.execute_sql('select case_id, date_modified from cases '
                                                 'where cases.domain_id = %d' % self.domain.id)
-        existing_case_ids = [c[0] for c in cases_cur.fetchall()]
+        case_updates_dict = dict([(c[0],c[1]) for c in cases_cur.fetchall()])
+        existing_case_ids = case_updates_dict.keys()
         
         insert_dicts = []
-        update_dicts = []
         for inccase in inccases_q.iterator():
-            if inccase.user in user_id_dict and inccase.owner in user_id_dict:
+            if not inccase.user in user_id_dict:
+                logger.warn("while inserting case with ID %s for domain %s couldn't find user with user ID %s" % (inccase.case, inccase.domain, inccase.user))
+                user_id = User.create(user=inccase.user, domain=self.domain)
+                user_id_dict[inccase.user] = user_id
                 
-                # note different date formats for these
-                opened = datetime.datetime.strptime(inccase.date_opened, '%Y-%m-%dT%H:%M:%S') if inccase.date_opened else None
-                modified = datetime.datetime.strptime(inccase.date_modified, '%Y-%m-%d %H:%M:%S') if inccase.date_modified else None
-                closed = datetime.datetime.strptime(inccase.date_closed, '%Y-%m-%d %H:%M:%S') if inccase.date_closed else None
-                    
-                is_closed = inccase.closed == 'True'
+            if not inccase.owner in user_id_dict:
+                logger.warn("while inserting case with ID %s for domain %s couldn't find owner user with user ID %s" % (inccase.case, inccase.domain, inccase.owner))
+                owner_id = User.create(user=inccase.owner, domain=self.domain)
+                user_id_dict[inccase.owner] = owner_id
                 
-                row = {'case':inccase.case, 'user':user_id_dict[inccase.user], 'owner': user_id_dict[inccase.owner],
-                       'parent':inccase.parent, 'case_type':inccase.case_type, 'date_opened':opened, 'date_modified': modified,
-                       'date_closed':closed, 'closed':is_closed, 'domain':self.domain}
+            # note different date formats for these
+            opened = datetime.datetime.strptime(inccase.date_opened, '%Y-%m-%dT%H:%M:%S') if inccase.date_opened else None
+            modified = datetime.datetime.strptime(inccase.date_modified, '%Y-%m-%d %H:%M:%S') if inccase.date_modified else None
+            closed = datetime.datetime.strptime(inccase.date_closed, '%Y-%m-%d %H:%M:%S') if inccase.date_closed else None
                 
-                if inccase.case in existing_case_ids:
+            is_closed = inccase.closed == 'True'
+            
+            row = {'case':inccase.case, 'user':user_id_dict[inccase.user], 'owner': user_id_dict[inccase.owner],
+                   'parent':inccase.parent, 'case_type':inccase.case_type, 'date_opened':opened, 'date_modified': modified,
+                   'date_closed':closed, 'closed':is_closed, 'domain':self.domain}
+            
+            # update if we have the case already and the modification date is greater than the last modification
+            if inccase.case in existing_case_ids:
+                if (case_updates_dict[inccase.case] is None) or (modified > case_updates_dict[inccase.case]):
                     q = Cases.update(**row).where(Cases.case == row['case'])
                     q.execute()
-                else:
-                    insert_dicts.append(row)
+            # else just include in bulk insert
             else:
-                logger.warn("while inserting case with ID %s for domain %s couldn't find either the user or owner. user ID is %s, owner ID is %s" % (inccase.case, inccase.domain, inccase.user, inccase.owner))
-        
+                insert_dicts.append(row)
+                
         if insert_dicts:
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
             logger.info("inserting %d cases for domain %s" % (len(deduped), self.domain.name))
@@ -438,28 +447,29 @@ class FormLoader(Loader):
         
         for incform in incform_q.iterator():
             if incform.form not in existing_form_ids:
-                if incform.user in user_id_dict:
-                    start = datetime.datetime.strptime(incform.time_start, '%Y-%m-%dT%H:%M:%S') if incform.time_start else None
-                    end = datetime.datetime.strptime(incform.time_end, '%Y-%m-%dT%H:%M:%S') if incform.time_end else None
-                    rec = datetime.datetime.strptime(incform.received_on, '%Y-%m-%dT%H:%M:%S') if incform.received_on else None
-                    
-                    phone = (incform.is_phone_submission == "1.0")
-                    
-                    application = Application.get_by_app_id_str(incform.app, self.domain)
-                    application_id = application.id if application else None
-                    
-                    formdef = FormDefinition.get_by_xmlns_and_application(incform.xmlns, application, self.domain)
-                    formdef_id = formdef.id if formdef else None
-                    
-                    row = {'form':incform.form, 'formdef':formdef_id, 'application':application_id,
-                           'time_start':start, 'time_end':end, 'received_on':rec,
-                           'app_version':incform.app_version, 'is_phone_submission': phone,
-                           'device':incform.device, 'user':user_id_dict[incform.user], 'domain':self.domain}
-                    
-                    insert_dicts.append(row)
-                else:
-                    logger.warn("while inserting form with ID %s for domain %s couldn't find user. user ID is %s" % (incform.form, incform.domain, incform.user))
-        
+                if not incform.user in user_id_dict:
+                    logger.warn("while inserting form with ID %s for domain %s couldn't find user with user ID %s" % (incform.form, incform.domain, incform.user))
+                    user_id = User.create(user=incform.user, domain=self.domain)
+                    user_id_dict[incform.user] = user_id
+                
+                start = datetime.datetime.strptime(incform.time_start, '%Y-%m-%dT%H:%M:%S') if incform.time_start else None
+                end = datetime.datetime.strptime(incform.time_end, '%Y-%m-%dT%H:%M:%S') if incform.time_end else None
+                rec = datetime.datetime.strptime(incform.received_on, '%Y-%m-%dT%H:%M:%S') if incform.received_on else None
+                
+                phone = (incform.is_phone_submission == "1.0")
+                
+                application = Application.get_by_app_id_str(incform.app, self.domain)
+                application_id = application.id if application else None
+                
+                formdef = FormDefinition.get_by_xmlns_and_application(incform.xmlns, application, self.domain)
+                formdef_id = formdef.id if formdef else None
+                
+                row = {'form':incform.form, 'formdef':formdef_id, 'application':application_id,
+                       'time_start':start, 'time_end':end, 'received_on':rec,
+                       'app_version':incform.app_version, 'is_phone_submission': phone,
+                       'device':incform.device, 'user':user_id_dict[incform.user], 'domain':self.domain}
+                
+                insert_dicts.append(row)
         
         if insert_dicts:
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
@@ -530,11 +540,12 @@ class VisitLoader(Loader):
     
     _db_warehouse_table_class = Visit
 
-    def __init__(self, domain):
+    def __init__(self, domain, regenerate_all):
         '''
         Constructor
         '''
         self.domain = Domain.get(name=domain)
+        self.regenerate_all = regenerate_all
         super(VisitLoader, self).__init__()
          
     def delete_most_recent(self, user):
@@ -546,6 +557,11 @@ class VisitLoader(Loader):
             dq.execute()
         else:
             logger.debug('no visits to delete for user %s' % user.id)
+            
+    def delete_all(self, user):
+        logger.debug('deleting all visits for user %s ' % user.user)
+        dq = Visit.delete().where(Visit.user == user)
+        dq.execute()
         
     def create_visit(self, user, visited_forms):
         
@@ -560,7 +576,7 @@ class VisitLoader(Loader):
         logger.debug('saved visit with id %d for user %s, %d forms' % (v.id, user.id, len(visited_forms)))
         
     def do_load(self):
-        logger.info('TIMESTAMP starting visit table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+        logger.info('TIMESTAMP starting visit table load for domain %s regenerate_all is %s' % (self.domain.name, self.regenerate_all))
         users = User.select().where(User.domain == self.domain).order_by(User.user)
         
         # dict with case event ids as keys, case_ids as values
@@ -576,7 +592,10 @@ class VisitLoader(Loader):
         caseevent_parent_dict = dict(set(cur2.fetchall()))
         
         for usr in users:
-            self.delete_most_recent(usr)
+            if self.regenerate_all:
+                self.delete_all(usr)
+            else:
+                self.delete_most_recent(usr)
             
             logger.debug("getting visits for user %s" % usr.user)
             

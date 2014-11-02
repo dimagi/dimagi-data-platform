@@ -80,11 +80,11 @@ def load_and_cleanup(loader, extractor):
     if extractor:
         extractor.do_cleanup()
                 
-def update_for_domain(dname, password):
+def update_for_domain(dname, password, incremental):
     d = Domain.get(name=dname)
     
-    case_extractor = CommCareExportCaseExtractor(dname)
-    form_extractor = CommCareExportFormExtractor(dname)
+    case_extractor = CommCareExportCaseExtractor(dname, incremental)
+    form_extractor = CommCareExportFormExtractor(dname, incremental)
     user_extractor = CommCareExportUserExtractor(dname)
     webuser_extractor = CommCareExportWebUserExtractor(dname)
     devicelog_extractor = CommCareExportDeviceLogExtractor(dname)
@@ -128,8 +128,8 @@ def update_for_domain(dname, password):
         
         caseevent_loader = CaseEventLoader(dname)
         load_and_cleanup(caseevent_loader,form_extractor)
-        
-    visit_loader = VisitLoader(dname)
+    
+    visit_loader = VisitLoader(dname, regenerate_all=(not incremental))
     load_and_cleanup(visit_loader, None)
         
     device_logs_to_import = IncomingDeviceLog.get_unimported(dname).count()
@@ -138,13 +138,13 @@ def update_for_domain(dname, password):
         devicelog_loader = DeviceLogLoader(dname)
         load_and_cleanup(devicelog_loader,devicelog_extractor)
             
-def update_for_domains(domainlist, password):
+def update_for_domains(domainlist, password, incremental = True):
     '''
     update per-domain data for domains in domainlist, using given HQ password and username specified in config_sys.json for API calls.
     '''   
     for dname in domainlist:
         try:
-            update_for_domain(dname, password)
+            update_for_domain(dname, password, incremental)
                 
         except Exception, e:
                 logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % dname)
@@ -172,7 +172,7 @@ def main():
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
-        update_for_domains(domain_list, password)
+        update_for_domains(domain_list, password, incremental = False)
         
         #update_from_salesforce()
     

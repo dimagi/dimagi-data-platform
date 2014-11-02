@@ -525,7 +525,7 @@ class CaseEventLoader(Loader):
                     insert_dicts.append(row)
                 else :
                     logger.error("while inserting case event, could not find either form %s or case %s in domain %s" 
-                                 % (row[0], row[1], self.domain.name))
+                                 % (ce.form, ce.case if ce.case else ce.alt_case, self.domain.name))
         
         
         if insert_dicts:

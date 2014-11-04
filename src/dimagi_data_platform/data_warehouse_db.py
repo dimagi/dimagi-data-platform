@@ -162,38 +162,49 @@ models.append(FormDefinitionSubsector)
 
 class User(BaseModel):
     id = PrimaryKeyField(db_column='id')
-    user = CharField(db_column='user_id', max_length=255, null=True)
-    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='users')
+    user_id = CharField(db_column='user_id', max_length=255, null=True)
     
     username = CharField(db_column='username', max_length=255, null=True)
     first_name = CharField(db_column='first_name', max_length=255, null=True)
     last_name = CharField(db_column='last_name', max_length=255, null=True)
     default_phone_number = CharField(db_column='default_phone_number', max_length=255, null=True)
     email = CharField(db_column='email', max_length=255, null=True)
-    groups = ArrayField(CharField,null=True)
     phone_numbers= ArrayField(CharField,null=True)
-
+    
     class Meta:
         db_table = 'users'
 models.append(User)
 
+class MobileUser(BaseModel):
+    user = ForeignKeyField(User, db_column='user_pk',primary_key=True)
+    groups = ArrayField(CharField,null=True)
+    deleted = BooleanField(default=False, null=True)
+    deactivated = BooleanField(default=False, null=True)
+    
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='mobile_users')
+    
+    class Meta:
+        db_table = 'mobile_user'
+models.append(MobileUser)
+
 class WebUser(BaseModel):
-    id = PrimaryKeyField(db_column='id')
-    user = CharField(db_column='user_id', max_length=255, null=True)
-    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='webusers')
-    username = CharField(db_column='username', max_length=255, null=True)
-    first_name = CharField(db_column='first_name', max_length=255, null=True)
-    last_name = CharField(db_column='last_name', max_length=255, null=True)
-    default_phone_number = CharField(db_column='default_phone_number', max_length=255, null=True)
-    email = CharField(db_column='email', max_length=255, null=True)
-    is_admin = BooleanField(db_column='is_admin', null=True)
-    resource_uri = CharField(db_column='resource_uri', null=True)
-    webuser_role = CharField(db_column='webuser_role',max_length=255, null=True)
-    phone_numbers= ArrayField(CharField,null=True)
+    user = ForeignKeyField(User, db_column='user_pk',primary_key=True)
+    is_superuser = BooleanField(db_column='is_superuser', null=True)
 
     class Meta:
         db_table = 'web_user'
 models.append(WebUser)
+
+class WebUserDomain(BaseModel):
+    web_user = ForeignKeyField(db_column='web_user_pk', null=True, rel_model=WebUser, related_name='domain_links')
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='web_user_links')
+    webuser_role = CharField(db_column='webuser_role',max_length=255, null=True)
+    resource_uri = CharField(db_column='resource_uri',max_length=255, null=True)
+    is_admin = BooleanField(db_column='is_admin', null=True)
+
+    class Meta:
+        db_table = 'web_user_domain'
+models.append(WebUserDomain)
 
 class Visit(BaseModel):
     id = PrimaryKeyField(db_column='id')

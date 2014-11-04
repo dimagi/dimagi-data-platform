@@ -131,7 +131,7 @@ class DomainLoader(Loader):
                     if (attrs['Test Project?'].lower() == "true"):
                         domain.test = True
                     elif (attrs['Test Project?'].lower() == "false"):
-                        domain.test = True
+                        domain.test = False
                 if 'Active?' in attrs:
                     domain.active = (attrs['Active?'].lower() == "true")
                     

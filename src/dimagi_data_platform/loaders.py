@@ -274,11 +274,6 @@ class WebUserLoader(Loader):
     def load_from_API(self):
         for inc in IncomingWebUser.get_unimported(self.domain.name):
             try:
-                domain = Domain.get(name=inc.domain)
-            except Domain.DoesNotExist:
-                logger.warn('Domain with name %s does not exist, could not add Web User ' % (domain))
-                continue
-            try:
                 u = WebUser.get(user=inc.api_id, domain=domain)
             except WebUser.DoesNotExist:
                 u = WebUser(user=inc.api_id, domain=domain)

@@ -176,16 +176,22 @@ class User(BaseModel):
 models.append(User)
 
 class MobileUser(BaseModel):
-    user = ForeignKeyField(User, db_column='user_pk',primary_key=True)
+    user = ForeignKeyField(User, db_column='mobile_user_pk',primary_key=True)
     groups = ArrayField(CharField,null=True)
     deleted = BooleanField(default=False, null=True)
     deactivated = BooleanField(default=False, null=True)
     
-    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='mobile_users')
-    
     class Meta:
         db_table = 'mobile_user'
 models.append(MobileUser)
+
+class MobileUserDomain(BaseModel):
+    mobile_user = ForeignKeyField(db_column='mobile_user_pk', null=True, rel_model=MobileUser, related_name='domain_links')
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='mobile_user_links')
+
+    class Meta:
+        db_table = 'mobile_user_domain'
+models.append(MobileUserDomain)
 
 class WebUser(BaseModel):
     user = ForeignKeyField(User, db_column='user_pk',primary_key=True)

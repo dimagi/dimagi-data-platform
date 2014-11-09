@@ -16,7 +16,7 @@ from dimagi_data_platform import conf
 from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector, \
      User, Form, CaseEvent, Cases, FormDefinition, \
     Subsector, FormDefinitionSubsector, Visit, DomainSubsector, WebUser, \
-    DeviceLog, Application
+    DeviceLog, Application, MobileUser, MobileUserDomain, WebUserDomain
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm, IncomingFormDef, IncomingUser, IncomingWebUser, \
@@ -284,8 +284,23 @@ class WebUserLoader(Loader):
             u.default_phone_number = inc.default_phone_number
             u.email = inc.email
             u.phone_numbers = inc.phone_numbers.split(',') if inc.phone_numbers else None
-            
             u.save()
+            
+            try:
+                wu = WebUser.get(user=u)
+            except WebUser.DoesNotExist:
+                wu = WebUser(user=u)
+            wu.is_superuser = '@dimagi.com' in u.username
+            wu.save()
+            
+            try:
+                du = WebUserDomain.get(web_user=wu, domain=self.domain)
+            except WebUserDomain.DoesNotExist:
+                du = WebUserDomain(web_user=wu, domain=self.domain)
+            du.webuser_role = inc.webuser_role
+            du.resource_uri = inc.resource_uri
+            du.is_admin = inc.is_admin
+            du.save()
             
     def do_load(self):
         logger.info('TIMESTAMP starting web user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
@@ -319,6 +334,21 @@ class UserLoader(Loader):
             u.email = inc.email
             u.phone_numbers = inc.phone_numbers.split(',') if inc.phone_numbers else None
             u.save()
+            
+            try:
+                mu = MobileUser.get(user=u)
+            except MobileUser.DoesNotExist:
+                mu = MobileUser(user=u)
+            mu.groups = inc.groups
+            mu.completed_last_30 = inc.completed_last_30
+            mu.submitted_last_30 = inc.submitted_last_30
+            mu.save()
+            
+            try:
+                du = MobileUserDomain.get(mobile_user=mu, domain=self.domain)
+            except MobileUserDomain.DoesNotExist:
+                du = MobileUserDomain(mobile_user=mu, domain=self.domain)
+                du.save()
             
     def do_load(self):
         logger.info('TIMESTAMP starting user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))

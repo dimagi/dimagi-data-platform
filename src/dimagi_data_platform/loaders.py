@@ -274,9 +274,9 @@ class WebUserLoader(Loader):
     def load_from_API(self):
         for inc in IncomingWebUser.get_unimported(self.domain.name):
             try:
-                u = WebUser.get(user=inc.api_id, domain=domain)
-            except WebUser.DoesNotExist:
-                u = WebUser(user=inc.api_id, domain=domain)
+                u = User.get(user=inc.api_id)
+            except User.DoesNotExist:
+                u = User(user=inc.api_id)
                 
             u.username = inc.username
             u.first_name = inc.first_name
@@ -284,9 +284,6 @@ class WebUserLoader(Loader):
             u.default_phone_number = inc.default_phone_number
             u.email = inc.email
             u.phone_numbers = inc.phone_numbers.split(',') if inc.phone_numbers else None
-            u.is_admin = inc.is_admin
-            u.resource_uri = inc.resource_uri
-            u.webuser_role = inc. webuser_role
             
             u.save()
             
@@ -308,48 +305,24 @@ class UserLoader(Loader):
         '''
         self.domain = Domain.get(name=domain)
         super(UserLoader, self).__init__()
-        
-    def load_from_forms_and_cases(self):
-        case_users = IncomingCases.select(IncomingCases.user, IncomingCases.owner).where((IncomingCases.domain == self.domain.name) 
-                                                                                         & ((IncomingCases.imported == False) | (IncomingCases.imported >> None)))
-        
-        form_users = IncomingForm.select(IncomingForm.user).where((IncomingForm.domain == self.domain.name) & ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
-        incoming_user_ids = set([u.user for u in case_users] + [o.owner for o in case_users] + [f.user for f in form_users])
-        
-        existing_user_ids = set([u.user for u in self.domain.users])
-        user_ids_to_create = incoming_user_ids.difference(existing_user_ids)
-        
-        for user_id in user_ids_to_create:
-            new_user = User.create(user=user_id, domain=self.domain)
     
     def load_from_API(self):
         for inc in IncomingUser.get_unimported(self.domain.name):
             try:
-                domain = Domain.get(name=inc.domain)
-            except Domain.DoesNotExist:
-                logger.warn('Domain with name %s does not exist, could not add User ' % (domain))
-                continue
-            try:
-                u = User.get(user=inc.user_id, domain=domain)
+                u = User.get(user=inc.user_id)
             except User.DoesNotExist:
-                u = User(user=inc.user_id, domain=domain)
-                
+                u = User(user=inc.user_id)
             u.username = inc.username
             u.first_name = inc.first_name
             u.last_name = inc.last_name
             u.default_phone_number = inc.default_phone_number
             u.email = inc.email
-            u.groups = inc.groups.split(',') if inc.groups else None
             u.phone_numbers = inc.phone_numbers.split(',') if inc.phone_numbers else None
-            
             u.save()
             
     def do_load(self):
         logger.info('TIMESTAMP starting user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         self.load_from_API()
-        self.load_from_forms_and_cases()
-        
-        
 
 class CasesLoader(Loader):
     '''
@@ -382,12 +355,12 @@ class CasesLoader(Loader):
         for inccase in inccases_q.iterator():
             if not inccase.user in user_id_dict:
                 logger.warn("while inserting case with ID %s for domain %s couldn't find user with user ID %s" % (inccase.case, inccase.domain, inccase.user))
-                user_id = User.create(user=inccase.user, domain=self.domain)
+                user_id = User.create(user=inccase.user)
                 user_id_dict[inccase.user] = user_id
                 
             if not inccase.owner in user_id_dict:
                 logger.warn("while inserting case with ID %s for domain %s couldn't find owner user with user ID %s" % (inccase.case, inccase.domain, inccase.owner))
-                owner_id = User.create(user=inccase.owner, domain=self.domain)
+                owner_id = User.create(user=inccase.owner)
                 user_id_dict[inccase.owner] = owner_id
                 
             # note different date formats for these
@@ -447,7 +420,7 @@ class FormLoader(Loader):
             if incform.form not in existing_form_ids:
                 if not incform.user in user_id_dict:
                     logger.warn("while inserting form with ID %s for domain %s couldn't find user with user ID %s" % (incform.form, incform.domain, incform.user))
-                    user_id = User.create(user=incform.user, domain=self.domain)
+                    user_id = User.create(user=incform.user)
                     user_id_dict[incform.user] = user_id
                 
                 start = datetime.datetime.strptime(incform.time_start, '%Y-%m-%dT%H:%M:%S') if incform.time_start else None
@@ -707,9 +680,12 @@ class DeviceLogLoader(Loader):
                     if inc.user_id in user_id_dict:
                         user_id = user_id_dict[inc.user_id]
                     elif inc.username and inc.username in user_username_dict:
-                        user_id = user_id_dict[inc.username]
+                        user_id = user_username_dict[inc.username]
                     else:
-                        user_id = User.create(user=inc.user_id, username=inc.username, domain=self.domain)
+                        logger.warn("while inserting device log for domain %s "
+                        "couldn't find user with user ID %s or username %s" % (inc.domain, inc.user_id, inc.username))
+                        user_id = User.create(user=inc.user_id, username=inc.username)
+                        user_id_dict[inc.user_id] = user_id
                 else:
                     user_id = None
                         

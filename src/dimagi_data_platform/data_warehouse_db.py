@@ -176,8 +176,11 @@ class User(BaseModel):
 models.append(User)
 
 class MobileUser(BaseModel):
-    user = ForeignKeyField(User, db_column='mobile_user_pk',primary_key=True)
+    user = ForeignKeyField(User, db_column='user_pk',primary_key=True)
     groups = ArrayField(CharField,null=True)
+    completed_last_30 = IntegerField(null=True)
+    submitted_last_30 = IntegerField(null=True)
+    user_data = JSONField(null=True)
     deleted = BooleanField(default=False, null=True)
     deactivated = BooleanField(default=False, null=True)
     

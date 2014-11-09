@@ -303,7 +303,8 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Literal('phone_numbers'),
                              Literal('user_data'),
                              Literal('domain')],
-                   source=Map(source=Apply(Reference('api_data'), Literal('user')),
+                   source=Map(source=Apply(Reference('api_data'), Literal('user'),
+                                           Literal({"extras": True})),
                               body=List([Reference('id'),
                              Reference('username'),
                              Reference('first_name'),
@@ -313,6 +314,8 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Reference('groups'),
                              Reference('phone_numbers'),
                              Reference('user_data'),
+                             Reference('extras.completed_last_30'),
+                             Reference('extras.submitted_last_30'),
                              Literal(self.domain)])))
         return user_query
     

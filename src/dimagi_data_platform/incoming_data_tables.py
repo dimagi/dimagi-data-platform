@@ -112,6 +112,8 @@ class IncomingUser(BaseDomainLinkedModel):
     email = CharField(db_column='email', max_length=255, null=True)
     groups = TextField(db_column='groups', null=True)
     phone_numbers= TextField(db_column='phone_numbers',  null=True)
+    completed_last_30 = IntegerField(null=True)
+    submitted_last_30 = IntegerField(null=True)
     user_data = TextField(db_column='user_data',  null=True)
     
     class Meta:

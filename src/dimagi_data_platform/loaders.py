@@ -344,7 +344,7 @@ class UserLoader(Loader):
             except MobileUser.DoesNotExist:
                 logger.info('creating new mobile user for user_id %s' % inc.user_id)
                 mu = MobileUser.create(user=u)
-            mu.groups = inc.groups
+            mu.groups = inc.groups.split(',') if inc.groups else None
             mu.completed_last_30 = inc.completed_last_30
             mu.submitted_last_30 = inc.submitted_last_30
             mu.save()

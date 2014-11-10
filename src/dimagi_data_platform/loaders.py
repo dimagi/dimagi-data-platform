@@ -347,6 +347,8 @@ class UserLoader(Loader):
             mu.groups = inc.groups.split(',') if inc.groups else None
             mu.completed_last_30 = inc.completed_last_30
             mu.submitted_last_30 = inc.submitted_last_30
+            mu.deactivated = inc.deactivated
+            mu.deleted = inc.deleted
             mu.save()
             
             try:

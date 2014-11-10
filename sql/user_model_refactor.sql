@@ -23,6 +23,8 @@ update device_log set user_id = new_id from tmp_user_mapping where device_log.us
 
 alter table incoming_users add column completed_last_30 integer;
 alter table incoming_users add column submitted_last_30 integer;
+alter table incoming_users add column deactivated boolean;
+alter table incoming_users add column deleted boolean;
 
 delete from mobile_user_domain;
 delete from mobile_user;
@@ -37,6 +39,7 @@ insert into web_user_domain(web_user_pk, domain_id, is_admin, webuser_role, reso
 from tmp_user_mapping, web_user_old where web_user_old.user_id = tmp_user_mapping.user_id group by new_id, tmp_user_mapping.domain_id, is_admin, webuser_role, resource_uri  );
 
 delete from users where id not in (select new_id from tmp_user_mapping)
+alter table users drop column domain_id;
 
 select user_pk, domain_id 
 from mobile_user, users 
@@ -57,3 +60,8 @@ domain, mobile_user, mobile_user_domain
 where mobile_user_domain.mobile_user_pk = mobile_user.mobile_user_pk and mobile_user_domain.domain_id = domain.id
 group by name
 order by name
+
+select * from users, mobile_user, mobile_user_domain
+where users.id = mobile_user.user_pk
+and mobile_user.user_pk = mobile_user_domain.mobile_user_pk
+and mobile_user_domain.domain_id = (select id from domain where name like 'melissa-test-project')

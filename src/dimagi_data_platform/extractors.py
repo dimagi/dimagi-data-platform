@@ -284,10 +284,11 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingUser
     
-    def __init__(self, domain):
+    def __init__(self, domain, archived = False):
         '''
         Constructor
         '''  
+        self.archived = archived
         super(CommCareExportUserExtractor, self).__init__(self._incoming_table_class, domain)
     
     @property
@@ -304,9 +305,11 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Literal('user_data'),
                              Literal('completed_last_30'),
                              Literal('submitted_last_30'),
-                             Literal('domain'),],
+                             Literal('domain'),
+                             Literal('deleted'),
+                             Literal('deactivated')],
                    source=Map(source=Apply(Reference('api_data'), Literal('user'),
-                                           Literal({"extras": True})),
+                                           Literal({"extras": True, "archived":self.archived})),
                               body=List([Reference('id'),
                              Reference('username'),
                              Reference('first_name'),
@@ -318,7 +321,9 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Reference('user_data'),
                              Reference('extras.completed_last_30'),
                              Reference('extras.submitted_last_30'),
-                             Literal(self.domain)])))
+                             Literal(self.domain),
+                             Literal(False), #deleted users don't show up in the API results
+                             Literal(self.archived)])))
         return user_query
     
 class CommCareExportWebUserExtractor(CommCareExportExtractor):

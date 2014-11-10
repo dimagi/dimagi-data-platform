@@ -114,6 +114,8 @@ class IncomingUser(BaseDomainLinkedModel):
     phone_numbers= TextField(db_column='phone_numbers',  null=True)
     completed_last_30 = IntegerField(null=True)
     submitted_last_30 = IntegerField(null=True)
+    deactivated = BooleanField(null=True)
+    deleted = BooleanField(null=True)
     user_data = TextField(db_column='user_data',  null=True)
     
     class Meta:

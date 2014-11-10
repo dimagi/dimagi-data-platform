@@ -86,11 +86,12 @@ def update_for_domain(dname, password, incremental):
     case_extractor = CommCareExportCaseExtractor(dname, incremental)
     form_extractor = CommCareExportFormExtractor(dname, incremental)
     user_extractor = CommCareExportUserExtractor(dname)
+    archived_user_extractor = CommCareExportUserExtractor(dname, archived = True)
     webuser_extractor = CommCareExportWebUserExtractor(dname)
     devicelog_extractor = CommCareExportDeviceLogExtractor(dname)
     formdef_extractor = CommCareSlumberFormDefExtractor('v0.5', dname, conf.CC_USER, password)
     
-    extracters = [case_extractor,form_extractor,user_extractor,webuser_extractor,formdef_extractor, devicelog_extractor]
+    extracters = [case_extractor,form_extractor,user_extractor,archived_user_extractor,webuser_extractor,formdef_extractor, devicelog_extractor]
     logger.info('TIMESTAMP starting commcare export for domain %s' % d.name)
     api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(conf.CC_USER, password)
     

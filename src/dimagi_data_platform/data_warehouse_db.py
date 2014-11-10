@@ -189,15 +189,15 @@ class MobileUser(BaseModel):
 models.append(MobileUser)
 
 class MobileUserDomain(BaseModel):
-    mobile_user = ForeignKeyField(db_column='mobile_user_pk', null=True, rel_model=MobileUser, related_name='domain_links')
-    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='mobile_user_links')
+    mobile_user = ForeignKeyField(MobileUser, db_column='mobile_user_pk', related_name='domain_links')
+    domain = ForeignKeyField(db_column='domain_id', rel_model=Domain, related_name='mobile_user_links')
 
     class Meta:
         db_table = 'mobile_user_domain'
 models.append(MobileUserDomain)
 
 class WebUser(BaseModel):
-    user = ForeignKeyField(User, db_column='user_pk',primary_key=True)
+    user = ForeignKeyField(rel_model=User, db_column='user_pk',primary_key=True)
     is_superuser = BooleanField(db_column='is_superuser', null=True)
 
     class Meta:
@@ -205,8 +205,8 @@ class WebUser(BaseModel):
 models.append(WebUser)
 
 class WebUserDomain(BaseModel):
-    web_user = ForeignKeyField(db_column='web_user_pk', null=True, rel_model=WebUser, related_name='domain_links')
-    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='web_user_links')
+    web_user = ForeignKeyField(WebUser, db_column='web_user_pk', related_name='domain_links')
+    domain = ForeignKeyField(Domain,db_column='domain_id', related_name='web_user_links')
     webuser_role = CharField(db_column='webuser_role',max_length=255, null=True)
     resource_uri = CharField(db_column='resource_uri',max_length=255, null=True)
     is_admin = BooleanField(db_column='is_admin', null=True)

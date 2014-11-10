@@ -12,7 +12,7 @@ from pandas.core.frame import DataFrame
 from peewee import prefetch
 import sqlalchemy
 
-from dimagi_data_platform import conf
+from dimagi_data_platform import conf, data_warehouse_db
 from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector, \
      User, Form, CaseEvent, Cases, FormDefinition, \
     Subsector, FormDefinitionSubsector, Visit, DomainSubsector, WebUser, \
@@ -274,9 +274,10 @@ class WebUserLoader(Loader):
     def load_from_API(self):
         for inc in IncomingWebUser.get_unimported(self.domain.name):
             try:
-                u = User.get(user=inc.api_id)
+                u = User.get(user_id=inc.api_id)
             except User.DoesNotExist:
-                u = User(user=inc.api_id)
+                logger.info('creating new web user for user_id %s' % inc.api_id)
+                u = User.create(user_id=inc.api_id)
                 
             u.username = inc.username
             u.first_name = inc.first_name
@@ -285,18 +286,20 @@ class WebUserLoader(Loader):
             u.email = inc.email
             u.phone_numbers = inc.phone_numbers.split(',') if inc.phone_numbers else None
             u.save()
-            
+
             try:
                 wu = WebUser.get(user=u)
             except WebUser.DoesNotExist:
-                wu = WebUser(user=u)
+                logger.info('creating new web user for user_id %s' % inc.api_id)
+                wu = WebUser.create(user=u)
             wu.is_superuser = '@dimagi.com' in u.username
             wu.save()
             
             try:
-                du = WebUserDomain.get(web_user=wu, domain=self.domain)
+                du = WebUserDomain.get(web_user=u.id, domain=self.domain)
             except WebUserDomain.DoesNotExist:
-                du = WebUserDomain(web_user=wu, domain=self.domain)
+                logger.info('creating new web user domain link for user_id %s' % inc.api_id)
+                du = WebUserDomain.create(web_user=u.id, domain=self.domain)
             du.webuser_role = inc.webuser_role
             du.resource_uri = inc.resource_uri
             du.is_admin = inc.is_admin
@@ -324,9 +327,10 @@ class UserLoader(Loader):
     def load_from_API(self):
         for inc in IncomingUser.get_unimported(self.domain.name):
             try:
-                u = User.get(user=inc.user_id)
+                u = User.get(user_id=inc.user_id)
             except User.DoesNotExist:
-                u = User(user=inc.user_id)
+                logger.info('creating new user for user_id %s' % inc.user_id)
+                u = User.create(user_id=inc.user_id)
             u.username = inc.username
             u.first_name = inc.first_name
             u.last_name = inc.last_name
@@ -338,16 +342,18 @@ class UserLoader(Loader):
             try:
                 mu = MobileUser.get(user=u)
             except MobileUser.DoesNotExist:
-                mu = MobileUser(user=u)
+                logger.info('creating new mobile user for user_id %s' % inc.user_id)
+                mu = MobileUser.create(user=u)
             mu.groups = inc.groups
             mu.completed_last_30 = inc.completed_last_30
             mu.submitted_last_30 = inc.submitted_last_30
             mu.save()
             
             try:
-                du = MobileUserDomain.get(mobile_user=mu, domain=self.domain)
+                du = MobileUserDomain.get(mobile_user=u.id, domain=self.domain)
             except MobileUserDomain.DoesNotExist:
-                du = MobileUserDomain(mobile_user=mu, domain=self.domain)
+                logger.info('creating new mobile user domain link for user_id %s' % inc.user_id)
+                du = MobileUserDomain.create(mobile_user=u.id, domain=self.domain)
                 du.save()
             
     def do_load(self):
@@ -373,8 +379,8 @@ class CasesLoader(Loader):
         inccases_q = IncomingCases.get_unimported(self.domain.name)
         logger.info('Incoming cases table has %d records not imported' % inccases_q.count())
         
-        user_id_q = self.domain.users.select()
-        user_id_dict = dict([(u.user, u) for u in user_id_q])
+        user_id_q = User.select()
+        user_id_dict = dict([(u.user_id, u) for u in user_id_q])
         
         cases_cur = Cases._meta.database.execute_sql('select case_id, date_modified from cases '
                                                 'where cases.domain_id = %d' % self.domain.id)
@@ -385,12 +391,12 @@ class CasesLoader(Loader):
         for inccase in inccases_q.iterator():
             if not inccase.user in user_id_dict:
                 logger.warn("while inserting case with ID %s for domain %s couldn't find user with user ID %s" % (inccase.case, inccase.domain, inccase.user))
-                user_id = User.create(user=inccase.user)
+                user_id = User.create(user_id=inccase.user)
                 user_id_dict[inccase.user] = user_id
                 
             if not inccase.owner in user_id_dict:
                 logger.warn("while inserting case with ID %s for domain %s couldn't find owner user with user ID %s" % (inccase.case, inccase.domain, inccase.owner))
-                owner_id = User.create(user=inccase.owner)
+                owner_id = User.create(user_id=inccase.owner)
                 user_id_dict[inccase.owner] = owner_id
                 
             # note different date formats for these
@@ -437,8 +443,8 @@ class FormLoader(Loader):
         incform_q = IncomingForm.get_unimported(self.domain.name)
         logger.info('Incoming form table has %d records not imported' % incform_q.count())
         
-        user_id_q = self.domain.users.select()
-        user_id_dict = dict([(u.user, u) for u in user_id_q])
+        user_id_q = User.select()
+        user_id_dict = dict([(u.user_id, u) for u in user_id_q])
         
         forms_cur = Form._meta.database.execute_sql('select form_id from form '
                                                 'where form.domain_id = %d' % self.domain.id)
@@ -450,7 +456,7 @@ class FormLoader(Loader):
             if incform.form not in existing_form_ids:
                 if not incform.user in user_id_dict:
                     logger.warn("while inserting form with ID %s for domain %s couldn't find user with user ID %s" % (incform.form, incform.domain, incform.user))
-                    user_id = User.create(user=incform.user)
+                    user_id = User.create(user_id=incform.user)
                     user_id_dict[incform.user] = user_id
                 
                 start = datetime.datetime.strptime(incform.time_start, '%Y-%m-%dT%H:%M:%S') if incform.time_start else None
@@ -560,7 +566,7 @@ class VisitLoader(Loader):
             logger.debug('no visits to delete for user %s' % user.id)
             
     def delete_all(self, user):
-        logger.debug('deleting all visits for user %s ' % user.user)
+        logger.debug('deleting all visits for user %s ' % user.user_id)
         dq = Visit.delete().where(Visit.user == user)
         dq.execute()
         
@@ -578,7 +584,12 @@ class VisitLoader(Loader):
         
     def do_load(self):
         logger.info('TIMESTAMP starting visit table load for domain %s regenerate_all is %s' % (self.domain.name, self.regenerate_all))
-        users = User.select().where(User.domain == self.domain).order_by(User.user)
+        
+        # all users who have submitted forms to this domain
+        user_id_cur = Form._meta.database.execute_sql('select id from users where id in '
+                                                    '(select user_id from form where domain_id = %d )' % self.domain.id)
+        user_id_list = [item[0] for item in user_id_cur.fetchall()]
+        users = User.select().where(User.id << user_id_list).order_by(User.user_id)
         
         # dict with case event ids as keys, case_ids as values
         cur1 = CaseEvent._meta.database.execute_sql('select case_event.id, cases.case_id from cases, case_event '
@@ -598,7 +609,7 @@ class VisitLoader(Loader):
             else:
                 self.delete_most_recent(usr)
             
-            logger.debug("getting visits for user %s" % usr.user)
+            logger.debug("getting visits for user %s" % usr.user_id)
             
             # forms already in visit
             prev_visited_forms = []
@@ -680,8 +691,8 @@ class DeviceLogLoader(Loader):
         super(DeviceLogLoader, self).__init__()
     
     def load_from_API(self):
-        user_q = self.domain.users.select()
-        user_id_dict = dict([(u.user, u.id) for u in user_q])
+        user_q = User.select()
+        user_id_dict = dict([(u.user_id, u.id) for u in user_q])
     
         user_username_dict = dict([((u.username.split('@')[0]), u.id) for u in user_q if (u.username and '@' in u.username)])
         
@@ -714,7 +725,7 @@ class DeviceLogLoader(Loader):
                     else:
                         logger.warn("while inserting device log for domain %s "
                         "couldn't find user with user ID %s or username %s" % (inc.domain, inc.user_id, inc.username))
-                        user_id = User.create(user=inc.user_id, username=inc.username)
+                        user_id = User.create(user_id=inc.user_id, username=inc.username)
                         user_id_dict[inc.user_id] = user_id
                 else:
                     user_id = None

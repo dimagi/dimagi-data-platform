@@ -4,7 +4,6 @@ update users set username=web_user_old.username, first_name=web_user_old.first_n
 default_phone_number = web_user_old.default_phone_number, email = web_user_old.email, phone_numbers=web_user_old.phone_numbers 
 from web_user_old where users.user_id = web_user_old.user_id and users.id in (select max (id) from users group by user_id);
 
-drop table tmp_user_mapping;
 create table tmp_user_mapping as 
 (select a.user_id, a.id as new_id, b.id as old_id, b.domain_id
 from (select id, user_id from users where (username is not null and id in (select max(id) from users where user_id is not null group by user_id, username))
@@ -12,7 +11,6 @@ or id in (select max(id) from users as a where not exists (select 1 from users a
 or id = (select max(id) from users where user_id is null)) as a, users as b
 where ((a.user_id = b.user_id) or (a.user_id is null and b.user_id is null)));
 
-select * from tmp_user_mapping;
 select user_id, count(old_id) from tmp_user_mapping where old_id <> new_id group by user_id;
 select user_id, count (distinct new_id) from tmp_user_mapping group by user_id;
 
@@ -22,6 +20,10 @@ update cases set owner_id = new_id from tmp_user_mapping where cases.owner_id = 
 update device_log set user_id = new_id from tmp_user_mapping where device_log.user_id = old_id and old_id <> new_id;
 
 --create missing tables
+
+alter table incoming_users add column completed_last_30 integer;
+alter table incoming_users add column submitted_last_30 integer;
+
 delete from mobile_user_domain;
 delete from mobile_user;
 insert into mobile_user (select id, groups from users where user_id not in (select user_id from web_user_old) and id in (select new_id from tmp_user_mapping));

@@ -61,6 +61,8 @@ where mobile_user_domain.mobile_user_pk = mobile_user.mobile_user_pk and mobile_
 group by name
 order by name
 
+select * from incoming_users order by id desc limit 10
+
 select * from users, mobile_user, mobile_user_domain
 where users.id = mobile_user.user_pk
 and mobile_user.user_pk = mobile_user_domain.mobile_user_pk

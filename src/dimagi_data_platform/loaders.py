@@ -323,40 +323,43 @@ class UserLoader(Loader):
         '''
         self.domain = Domain.get(name=domain)
         super(UserLoader, self).__init__()
+        
+    def create_or_update_user(self,incoming_user):
+        try:
+            u = User.get(user_id=incoming_user.user_id)
+        except User.DoesNotExist:
+            logger.info('creating new user for user_id %s' % incoming_user.user_id)
+            u = User.create(user_id=incoming_user.user_id)
+        u.username = incoming_user.username
+        u.first_name = incoming_user.first_name
+        u.last_name = incoming_user.last_name
+        u.default_phone_number = incoming_user.default_phone_number
+        u.email = incoming_user.email
+        u.phone_numbers = incoming_user.phone_numbers.split(',') if incoming_user.phone_numbers else None
+        u.save()
+        
+        try:
+            mu = MobileUser.get(user=u)
+        except MobileUser.DoesNotExist:
+            logger.info('creating new mobile user for user_id %s' % incoming_user.user_id)
+            mu = MobileUser.create(user=u)
+        mu.groups = incoming_user.groups.split(',') if inc.groups else None
+        mu.completed_last_30 = incoming_user.completed_last_30
+        mu.submitted_last_30 = incoming_user.submitted_last_30
+        mu.deactivated = incoming_user.deactivated
+        mu.deleted = incoming_user.deleted
+        mu.save()
+        
+        try:
+            du = MobileUserDomain.get(mobile_user=u.id, domain=self.domain)
+        except MobileUserDomain.DoesNotExist:
+            logger.info('creating new mobile user domain link for user_id %s' % incoming_user.user_id)
+            du = MobileUserDomain.create(mobile_user=u.id, domain=self.domain)
+            du.save()
     
     def load_from_API(self):
         for inc in IncomingUser.get_unimported(self.domain.name):
-            try:
-                u = User.get(user_id=inc.user_id)
-            except User.DoesNotExist:
-                logger.info('creating new user for user_id %s' % inc.user_id)
-                u = User.create(user_id=inc.user_id)
-            u.username = inc.username
-            u.first_name = inc.first_name
-            u.last_name = inc.last_name
-            u.default_phone_number = inc.default_phone_number
-            u.email = inc.email
-            u.phone_numbers = inc.phone_numbers.split(',') if inc.phone_numbers else None
-            u.save()
-            
-            try:
-                mu = MobileUser.get(user=u)
-            except MobileUser.DoesNotExist:
-                logger.info('creating new mobile user for user_id %s' % inc.user_id)
-                mu = MobileUser.create(user=u)
-            mu.groups = inc.groups.split(',') if inc.groups else None
-            mu.completed_last_30 = inc.completed_last_30
-            mu.submitted_last_30 = inc.submitted_last_30
-            mu.deactivated = inc.deactivated
-            mu.deleted = inc.deleted
-            mu.save()
-            
-            try:
-                du = MobileUserDomain.get(mobile_user=u.id, domain=self.domain)
-            except MobileUserDomain.DoesNotExist:
-                logger.info('creating new mobile user domain link for user_id %s' % inc.user_id)
-                du = MobileUserDomain.create(mobile_user=u.id, domain=self.domain)
-                du.save()
+            self.create_or_update_user(inc)
             
     def do_load(self):
         logger.info('TIMESTAMP starting user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))

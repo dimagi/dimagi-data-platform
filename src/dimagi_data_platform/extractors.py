@@ -379,13 +379,7 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
     def __init__(self, domain):
         '''
         Constructor
-        '''  
-        
-        # check if we have any existing device logs in the db for this domain. If not, try to import everything, ignoring the since param
-        d = Domain.get(name=domain)
-        if DeviceLog.select().where(DeviceLog.domain == d).count() == 0:
-            self.since = None
-            
+        '''
         super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, domain, chunked_by_date=True)
 
     @property
@@ -575,25 +569,4 @@ class SalesforceExtractor(Extractor):
         delete_q = self._incoming_table_class.delete()
         rows = delete_q.execute()
         logger.info('Deleted %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
-        
-class DeletedUserExtractor(Extractor):
-    _incoming_table_class = IncomingUser
-    
-    def __init__(self, api_version, domain, username, password, user_id):
-        '''
-        Constructor
-        '''
-        url = "https://www.commcarehq.org/a/%s/api/%s/user/%s" % (domain,api_version, user_id)
-        self.api = slumber.API(url, auth=HTTPDigestAuth(username, password))
-        self.incoming_user = None
-        super(CommCareSlumberFormDefExtractor, self).__init__(self._incoming_table_class)
-        
-    def do_extract(self):
-        res = self.api.get()
-        print res
-        
-    def do_cleanup(self):
-        if self.incoming_user:
-            self.incoming_user.imported = True
-            self.incoming_user.save()
     

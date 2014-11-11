@@ -104,7 +104,7 @@ def update_for_domain(dname, password, incremental):
     
     logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
     # these loaders should run even if there are no new forms, cases or device logs
-    user_loader = UserLoader(dname)
+    user_loader = UserLoader(dname,api_version='v0.5',username=conf.CC_USER, password=password)
     load_and_cleanup(user_loader,user_extractor)
     
     app_loader = ApplicationLoader(dname)
@@ -118,13 +118,13 @@ def update_for_domain(dname, password, incremental):
     cases_to_import = IncomingCases.get_unimported(dname).count()
     if (cases_to_import > 0):
         logger.info('We have %d cases to import' % cases_to_import)
-        case_loader = CasesLoader(dname)
+        case_loader = CasesLoader(dname, user_loader)
         load_and_cleanup(case_loader,case_extractor)
         
     forms_to_import = IncomingForm.get_unimported(dname).count()    
     if (forms_to_import > 0):
         logger.info('We have %d forms to import' % forms_to_import)
-        form_loader = FormLoader(dname)
+        form_loader = FormLoader(dname, user_loader)
         load_and_cleanup(form_loader,None)
         
         caseevent_loader = CaseEventLoader(dname)
@@ -136,7 +136,7 @@ def update_for_domain(dname, password, incremental):
     device_logs_to_import = IncomingDeviceLog.get_unimported(dname).count()
     if (device_logs_to_import > 0):
         logger.info('We have %d device log entries to import' % device_logs_to_import)
-        devicelog_loader = DeviceLogLoader(dname)
+        devicelog_loader = DeviceLogLoader(dname, user_loader)
         load_and_cleanup(devicelog_loader,devicelog_extractor)
             
 def update_for_domains(domainlist, password, incremental = True):

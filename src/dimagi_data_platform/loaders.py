@@ -414,11 +414,13 @@ class UserLoader(Loader):
         for inc in incoming_users:
             self.create_or_update_user(inc)
         
+        # check if there are any users we have previously got data on for this domain but who no longer show in results.
         domain_mobile_users = User.select(User.user_id).join(MobileUser).join(MobileUserDomain).where((MobileUserDomain.domain == self.domain) & ~(MobileUser.deleted))
         existing_user_ids = [exu.user_id for exu in domain_mobile_users if exu.user_id is not None]
         incoming_user_ids = [inc.user_id for inc in incoming_users if inc.user_id is not None]
         missing_user_ids = list(set(existing_user_ids) - set(incoming_user_ids))
         
+        # for each of these, check if they are deleted
         if missing_user_ids:
             logger.info('There are %d users in the database whose data was not returned by the API; checking if deleted' % len(missing_user_ids))
         
@@ -431,7 +433,6 @@ class UserLoader(Loader):
                     self.create_or_update_user(new_incoming_user)
                     new_incoming_user.imported = True
                     new_incoming_user.save()
-                
             
     def do_load(self):
         logger.info('TIMESTAMP starting user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))

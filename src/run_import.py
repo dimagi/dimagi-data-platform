@@ -18,7 +18,7 @@ from dimagi_data_platform.extractors import ExcelExtractor, \
     CommCareExportUserExtractor, CommCareExportDeviceLogExtractor, \
     CommCareExportWebUserExtractor, \
     CommCareSlumberFormDefExtractor, CommCareExportExtractor, \
-    SalesforceExtractor
+    SalesforceExtractor, HQAdminAPIExtractor
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \
     IncomingCases, IncomingDeviceLog
@@ -52,7 +52,7 @@ def setup():
     incoming_data_tables.create_missing_tables()
     data_warehouse_db.create_missing_tables()
     
-def update_hq_admin_data():
+def update_hq_admin_data(username, password):
     '''
     update domains, form definitions, and anything else that is not extracted per-domain from APIs
     '''
@@ -60,6 +60,8 @@ def update_hq_admin_data():
     importers.append(ExcelExtractor(IncomingDomain, "domains.xlsx"))
     importers.append(ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx"))
     importers.append(ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx"))
+    importers.append(HQAdminAPIExtractor('web-user',username,password))
+    importers.append(HQAdminAPIExtractor('project_space_metadata',username,password))
     
     for importer in importers:
         importer.do_extract()
@@ -80,7 +82,7 @@ def load_and_cleanup(loader, *extractors):
     for extractor in extractors:
         extractor.do_cleanup()
                 
-def update_for_domain(dname, password, incremental):
+def update_for_domain(dname, username, password, incremental):
     d = Domain.get(name=dname)
     
     case_extractor = CommCareExportCaseExtractor(dname, incremental)
@@ -93,7 +95,7 @@ def update_for_domain(dname, password, incremental):
     
     extracters = [case_extractor,form_extractor,user_extractor,archived_user_extractor,webuser_extractor,formdef_extractor, devicelog_extractor]
     logger.info('TIMESTAMP starting commcare export for domain %s' % d.name)
-    api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(conf.CC_USER, password)
+    api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(username, password)
     
     for extracter in extracters:
         if (isinstance(extracter, CommCareExportExtractor)):
@@ -164,16 +166,16 @@ def main():
         logger.info('TIMESTAMP starting run %s' % datetime.datetime.now())
         setup()
         
-        
+        username = conf.CC_USER
         password = getpass.getpass()
         
         logger.info('TIMESTAMP updating hq admin data - domains, forms definitions %s' % datetime.datetime.now())
-        #update_hq_admin_data()
+        update_hq_admin_data(username, password)
         domain_list = get_domains(conf.RUN_CONF_JSON)
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
-        update_for_domains(domain_list, password, incremental = False)
+        update_for_domains(domain_list, username, password, incremental = False)
         
         #update_from_salesforce()
     

@@ -74,10 +74,10 @@ def update_hq_admin_data():
             importer.do_cleanup()
 
 @db.commit_on_success
-def load_and_cleanup(loader, extractor):
+def load_and_cleanup(loader, *extractors):
     loader.do_load()
     
-    if extractor:
+    for extractor in extractors:
         extractor.do_cleanup()
                 
 def update_for_domain(dname, password, incremental):
@@ -105,10 +105,10 @@ def update_for_domain(dname, password, incremental):
     logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
     # these loaders should run even if there are no new forms, cases or device logs
     user_loader = UserLoader(dname,api_version='v0.5',username=conf.CC_USER, password=password)
-    load_and_cleanup(user_loader,user_extractor)
+    load_and_cleanup(user_loader,user_extractor, user_extractor)
     
     app_loader = ApplicationLoader(dname)
-    load_and_cleanup(app_loader,None) # don't clean up yet, formdef_loader uses the same incoming table
+    load_and_cleanup(app_loader) # don't clean up yet, formdef_loader uses the same incoming table
     formdef_loader = FormDefLoader(dname)
     load_and_cleanup(formdef_loader,formdef_extractor)
     
@@ -125,13 +125,13 @@ def update_for_domain(dname, password, incremental):
     if (forms_to_import > 0):
         logger.info('We have %d forms to import' % forms_to_import)
         form_loader = FormLoader(dname, user_loader)
-        load_and_cleanup(form_loader,None)
+        load_and_cleanup(form_loader)
         
         caseevent_loader = CaseEventLoader(dname)
         load_and_cleanup(caseevent_loader,form_extractor)
     
     visit_loader = VisitLoader(dname, regenerate_all=(not incremental))
-    load_and_cleanup(visit_loader, None)
+    load_and_cleanup(visit_loader)
         
     device_logs_to_import = IncomingDeviceLog.get_unimported(dname).count()
     if (device_logs_to_import > 0):

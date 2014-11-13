@@ -267,16 +267,18 @@ class WebUserLoader(Loader):
     '''
     
     _db_warehouse_table_class = WebUser
+    domain = None
     
-    def __init__(self, domain):
+    def __init__(self, domain=None):
         '''
         Constructor
         '''
-        self.domain = Domain.get(name=domain)
+        if domain:
+            self.domain = Domain.get(name=domain)
         super(WebUserLoader, self).__init__()
     
     def load_from_API(self):
-        for inc in IncomingWebUser.get_unimported(self.domain.name):
+        for inc in IncomingWebUser.get_unimported(self.domain.name if self.domain else None):
             try:
                 u = User.get(user_id=inc.api_id)
             except User.DoesNotExist:
@@ -299,18 +301,25 @@ class WebUserLoader(Loader):
             wu.is_superuser = '@dimagi.com' in u.username
             wu.save()
             
-            try:
-                du = WebUserDomain.get(web_user=u.id, domain=self.domain)
-            except WebUserDomain.DoesNotExist:
-                logger.info('creating new web user domain link for user_id %s' % inc.api_id)
-                du = WebUserDomain.create(web_user=u.id, domain=self.domain)
-            du.webuser_role = inc.webuser_role
-            du.resource_uri = inc.resource_uri
-            du.is_admin = inc.is_admin
-            du.save()
+            if inc.domain:
+                try:
+                    try:
+                        domain = Domain.get(name=inc.domain)
+                        du = WebUserDomain.get(web_user=u.id, domain=domain)
+                    except WebUserDomain.DoesNotExist:
+                        logger.info('creating new web user domain link for user_id %s' % inc.api_id)
+                        du = WebUserDomain.create(web_user=u.id, domain=domain)
+                    # if no info is available, keep the values we have
+                    du.webuser_role = inc.webuser_role if inc.webuser_role else du.webuser_role
+                    du.resource_uri = inc.resource_uri if inc.resource_uri else du.resource_uri
+                    du.is_admin = inc.is_admin if inc.is_admin else du.is_admin
+                    du.save()
+                    
+                except Domain.DoesNotExist:
+                    logger.error('No domain found with name %s' % inc.domain )
             
     def do_load(self):
-        logger.info('TIMESTAMP starting web user table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
+        logger.info('TIMESTAMP starting web user table load %s' % datetime.datetime.now())
         self.load_from_API()
             
 

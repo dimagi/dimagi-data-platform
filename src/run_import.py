@@ -18,7 +18,7 @@ from dimagi_data_platform.extractors import ExcelExtractor, \
     CommCareExportUserExtractor, CommCareExportDeviceLogExtractor, \
     CommCareExportWebUserExtractor, \
     CommCareSlumberFormDefExtractor, CommCareExportExtractor, \
-    SalesforceExtractor, HQAdminAPIExtractor
+    SalesforceExtractor, HQAdminAPIExtractor, WebuserAdminAPIExtractor
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \
     IncomingCases, IncomingDeviceLog
@@ -56,25 +56,20 @@ def update_hq_admin_data(username, password):
     '''
     update domains, form definitions, and anything else that is not extracted per-domain from APIs
     '''
-    importers = []
-    importers.append(ExcelExtractor(IncomingDomain, "domains.xlsx"))
-    importers.append(ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx"))
-    importers.append(ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx"))
-    importers.append(HQAdminAPIExtractor('web-user',username,password))
-    importers.append(HQAdminAPIExtractor('project_space_metadata',username,password))
+    webuser_extractor = WebuserAdminAPIExtractor(username,password)
+    domain_annotation_extractor = ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx")
+    form_annotation_extractor = ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx")
+    extractors = [domain_annotation_extractor,form_annotation_extractor]
     
-    for importer in importers:
-        importer.do_extract()
+    for extractor in extractors:
+        extractor.do_extract()
     
-    table_updaters = []
-    table_updaters.append(DomainLoader())
-        
-    for table_updater in table_updaters:
-        table_updater.do_load()
-        
-    for importer in importers:
-            importer.do_cleanup()
-
+    domain_loader = DomainLoader()
+    load_and_cleanup(domain_loader,domain_annotation_extractor)
+    
+    webuser_loader = WebUserLoader()
+    load_and_cleanup(webuser_loader,webuser_extractor)
+    
 @db.commit_on_success
 def load_and_cleanup(loader, *extractors):
     loader.do_load()

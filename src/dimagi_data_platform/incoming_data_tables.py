@@ -37,8 +37,11 @@ class BaseDomainLinkedModel(BaseModel):
     
     @classmethod
     def get_unimported(cls, dname):
-        return cls.select().where((cls.domain == dname) & ((cls.imported == False) | (cls.imported >> None)))
-        
+        if dname:
+            return cls.select().where((cls.domain == dname) & ((cls.imported == False) | (cls.imported >> None)))
+        else:
+            return cls.select().where((cls.imported == False) | (cls.imported >> None))
+
 models = []
 
 class IncomingDomain(BaseModel):

@@ -136,7 +136,7 @@ def update_for_domain(dname, username, password, incremental):
         devicelog_loader = DeviceLogLoader(dname, user_loader)
         load_and_cleanup(devicelog_loader,devicelog_extractor)
             
-def update_for_domains(domainlist, password, incremental = True):
+def update_for_domains(domainlist, username, password, incremental = True):
     '''
     update per-domain data for domains in domainlist, using given HQ password and username specified in config_sys.json for API calls.
     '''   

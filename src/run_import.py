@@ -59,7 +59,7 @@ def update_hq_admin_data(username, password):
     webuser_extractor = WebuserAdminAPIExtractor(username,password)
     domain_annotation_extractor = ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx")
     form_annotation_extractor = ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx")
-    extractors = [domain_annotation_extractor,form_annotation_extractor]
+    extractors = [webuser_extractor,domain_annotation_extractor,form_annotation_extractor]
     
     for extractor in extractors:
         extractor.do_extract()
@@ -142,7 +142,7 @@ def update_for_domains(domainlist, username, password, incremental = True):
     '''   
     for dname in domainlist:
         try:
-            update_for_domain(dname, password, incremental)
+            update_for_domain(dname, username, password, incremental)
                 
         except Exception, e:
                 logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % dname)

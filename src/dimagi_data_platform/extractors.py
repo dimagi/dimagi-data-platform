@@ -441,7 +441,7 @@ class CommCareSlumberFormDefExtractor(Extractor):
                     fd.save()
 
     def do_extract(self):
-        rec_data = self.api.application.get()
+        app_data = self.api.application.get()
         next_page = app_data['meta']['next']
         app_objects = app_data['objects']
         

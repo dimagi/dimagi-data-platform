@@ -12,7 +12,7 @@ or id = (select max(id) from users where user_id is null)) as a, users as b
 where ((a.user_id = b.user_id) or (a.user_id is null and b.user_id is null)));
 
 select user_id, count(old_id) from tmp_user_mapping where old_id <> new_id group by user_id;
-select user_id, count (distinct new_id) from tmp_user_mapping group by user_id;
+select user_id, count (distinct new_id) from tmp_user_mapping group by user_id having count (distinct new_id) > 1;
 
 update form set user_id = new_id from tmp_user_mapping where form.user_id = old_id and old_id <> new_id;
 update cases set user_id = new_id from tmp_user_mapping where cases.user_id = old_id and old_id <> new_id;

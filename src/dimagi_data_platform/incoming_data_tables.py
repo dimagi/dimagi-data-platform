@@ -8,8 +8,9 @@ Created on Jun 23, 2014
 from datetime import datetime
 import logging
 
-from peewee import Model, CharField, drop_model_tables, PrimaryKeyField
-from playhouse.postgres_ext import *
+from peewee import Model, CharField, drop_model_tables, PrimaryKeyField, \
+    BooleanField, TextField, IntegerField
+from playhouse.postgres_ext import HStoreField, JSONField
 
 from dimagi_data_platform import conf
 
@@ -47,6 +48,7 @@ models = []
 class IncomingDomain(BaseModel):
     
     attributes = HStoreField()
+    api_json = JSONField()
 
     class Meta:
         db_table = 'incoming_domain'

@@ -25,7 +25,7 @@ from dimagi_data_platform.data_warehouse_db import Domain, DeviceLog, \
     HQExtractLog
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
     IncomingCases, IncomingUser, IncomingDeviceLog, IncomingWebUser, \
-    IncomingFormDef, IncomingSalesforceRecord
+    IncomingFormDef, IncomingSalesforceRecord, IncomingDomain
 from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 
@@ -521,6 +521,20 @@ class WebuserAdminAPIExtractor(HQAdminAPIExtractor):
                 for domain in obj['domains']:
                     obj.update({'domain':domain})
                     IncomingWebUser.create(**obj)
+                    
+class ProjectSpaceAdminAPIExtractor(HQAdminAPIExtractor):
+    
+    _incoming_table_class = IncomingWebUser
+    _api_endpoint = 'project_space_metadata'
+    _limit = 20
+    
+    def __init__(self, username, password):
+        
+        super(WebuserAdminAPIExtractor, self).__init__(username, password)
+        
+    def save_incoming(self, rec_objects):
+        for obj in rec_objects:
+            IncomingDomain.create(api_json=json.dumps(obj))
     
 class ExcelExtractor(Extractor):
     '''

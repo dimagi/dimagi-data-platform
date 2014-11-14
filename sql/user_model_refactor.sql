@@ -11,6 +11,7 @@ or id in (select max(id) from users as a where not exists (select 1 from users a
 or id = (select max(id) from users where user_id is null)) as a, users as b
 where ((a.user_id = b.user_id) or (a.user_id is null and b.user_id is null)));
 
+--checks
 select user_id, count(old_id) from tmp_user_mapping where old_id <> new_id group by user_id;
 select user_id, count (distinct new_id) from tmp_user_mapping group by user_id having count (distinct new_id) > 1;
 
@@ -18,6 +19,7 @@ update form set user_id = new_id from tmp_user_mapping where form.user_id = old_
 update cases set user_id = new_id from tmp_user_mapping where cases.user_id = old_id and old_id <> new_id;
 update cases set owner_id = new_id from tmp_user_mapping where cases.owner_id = old_id and old_id <> new_id;
 update device_log set user_id = new_id from tmp_user_mapping where device_log.user_id = old_id and old_id <> new_id;
+update visit set user_id = new_id from tmp_user_mapping where device_log.user_id = old_id and old_id <> new_id;
 
 --create missing tables
 
@@ -26,21 +28,18 @@ alter table incoming_users add column submitted_last_30 integer;
 alter table incoming_users add column deactivated boolean;
 alter table incoming_users add column deleted boolean;
 
-delete from mobile_user_domain;
-delete from mobile_user;
 insert into mobile_user (select id, groups from users where user_id not in (select user_id from web_user_old) and id in (select new_id from tmp_user_mapping));
 insert into mobile_user_domain(mobile_user_pk, domain_id) (select new_id, domain_id from tmp_user_mapping where user_id not in (select user_id from web_user_old) 
 group by new_id, domain_id);
 
-delete from web_user_domain;
-delete from web_user;
 insert into web_user (select id from users where user_id in (select user_id from web_user_old) and id in (select new_id from tmp_user_mapping));
 insert into web_user_domain(web_user_pk, domain_id, is_admin, webuser_role, resource_uri) (select new_id, tmp_user_mapping.domain_id, is_admin, webuser_role, resource_uri 
 from tmp_user_mapping, web_user_old where web_user_old.user_id = tmp_user_mapping.user_id group by new_id, tmp_user_mapping.domain_id, is_admin, webuser_role, resource_uri  );
 
-delete from users where id not in (select new_id from tmp_user_mapping)
+delete from users where id not in (select new_id from tmp_user_mapping);
 alter table users drop column domain_id;
 
+--more checks
 select user_pk, domain_id 
 from mobile_user, users 
 where users.id = mobile_user.user_pk and users.username is not null

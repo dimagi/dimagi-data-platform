@@ -663,7 +663,7 @@ class VisitLoader(Loader):
         
         time_start = min(visited_forms, key=lambda x : x.time_start).time_start
         time_end = max(visited_forms, key=lambda x : x.time_end).time_end
-        v = Visit.create(user=user, time_start=time_start, time_end=time_end)
+        v = Visit.create(user=user, time_start=time_start, time_end=time_end, domain = self.domain)
         
         ids = [f.id for f in visited_forms]
         uq = Form.update(visit=v).where(Form.id << ids)

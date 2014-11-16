@@ -196,7 +196,7 @@ class FormDefLoader(Loader):
 
             else:
                 xmlns = attrs['Form xmlns']
-                app_id = attrs['Application ID'] if attrs['Application ID'] else None
+                app_id = attrs['Application ID'] if 'Application ID' in attrs else None
                 dname = attrs['Domain name']
                 subsector_names = [k.replace('Subsector_', '') for k, v in attrs.iteritems() if (k.startswith('Subsector_') & (v == 'Yes'))]
                 

@@ -19,7 +19,13 @@ update form set user_id = new_id from tmp_user_mapping where form.user_id = old_
 update cases set user_id = new_id from tmp_user_mapping where cases.user_id = old_id and old_id <> new_id;
 update cases set owner_id = new_id from tmp_user_mapping where cases.owner_id = old_id and old_id <> new_id;
 update device_log set user_id = new_id from tmp_user_mapping where device_log.user_id = old_id and old_id <> new_id;
-update visit set user_id = new_id from tmp_user_mapping where device_log.user_id = old_id and old_id <> new_id;
+
+alter table visit add column domain_id integer;
+alter table visit add CONSTRAINT visit_domain_id_fkey FOREIGN KEY (domain_id)
+      REFERENCES domain (id) MATCH SIMPLE
+      ON UPDATE NO ACTION ON DELETE NO ACTION;
+update visit set domain_id = users.domain_id from users where users.id = visit.user_id;
+update visit set user_id = new_id from tmp_user_mapping where visit.user_id = old_id and old_id <> new_id;
 
 --create missing tables
 
@@ -29,8 +35,9 @@ alter table incoming_users add column deactivated boolean;
 alter table incoming_users add column deleted boolean;
 
 insert into mobile_user (select id, groups from users where user_id not in (select user_id from web_user_old) and id in (select new_id from tmp_user_mapping));
-insert into mobile_user_domain(mobile_user_pk, domain_id) (select new_id, domain_id from tmp_user_mapping where user_id not in (select user_id from web_user_old) 
-group by new_id, domain_id);
+--insert into mobile_user_domain(mobile_user_pk, domain_id) (select new_id, domain_id from tmp_user_mapping where user_id not in (select user_id from web_user_old) 
+--and username is not null
+--group by new_id, domain_id);
 
 insert into web_user (select id from users where user_id in (select user_id from web_user_old) and id in (select new_id from tmp_user_mapping));
 insert into web_user_domain(web_user_pk, domain_id, is_admin, webuser_role, resource_uri) (select new_id, tmp_user_mapping.domain_id, is_admin, webuser_role, resource_uri 

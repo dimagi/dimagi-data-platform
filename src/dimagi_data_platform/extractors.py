@@ -284,10 +284,12 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingUser
     
-    def __init__(self, domain):
+    def __init__(self, domain, archived = False):
         '''
         Constructor
+        archived = True gets archived/deactivated users only, otherwise only active users are returned
         '''  
+        self.archived = archived
         super(CommCareExportUserExtractor, self).__init__(self._incoming_table_class, domain)
     
     @property
@@ -302,8 +304,13 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Literal('groups'),
                              Literal('phone_numbers'),
                              Literal('user_data'),
-                             Literal('domain')],
-                   source=Map(source=Apply(Reference('api_data'), Literal('user')),
+                             Literal('completed_last_30'),
+                             Literal('submitted_last_30'),
+                             Literal('domain'),
+                             Literal('deleted'),
+                             Literal('deactivated')],
+                   source=Map(source=Apply(Reference('api_data'), Literal('user'),
+                                           Literal({"extras": True, "archived":self.archived})),
                               body=List([Reference('id'),
                              Reference('username'),
                              Reference('first_name'),
@@ -313,7 +320,11 @@ class CommCareExportUserExtractor(CommCareExportExtractor):
                              Reference('groups'),
                              Reference('phone_numbers'),
                              Reference('user_data'),
-                             Literal(self.domain)])))
+                             Reference('extras.completed_last_30'),
+                             Reference('extras.submitted_last_30'),
+                             Literal(self.domain),
+                             Literal(False), #deleted users don't show up in the API results
+                             Literal(self.archived)])))
         return user_query
     
 class CommCareExportWebUserExtractor(CommCareExportExtractor):
@@ -369,13 +380,7 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
     def __init__(self, domain):
         '''
         Constructor
-        '''  
-        
-        # check if we have any existing device logs in the db for this domain. If not, try to import everything, ignoring the since param
-        d = Domain.get(name=domain)
-        if DeviceLog.select().where(DeviceLog.domain == d).count() == 0:
-            self.since = None
-            
+        '''
         super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, domain, chunked_by_date=True)
 
     @property
@@ -453,6 +458,78 @@ class CommCareSlumberFormDefExtractor(Extractor):
         rows = update_q.execute()
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
 
+class HQAdminAPIExtractor(Extractor):
+    
+    base_url = 'https://www.commcarehq.org/hq/admin/api/global/'
+    
+    def __init__(self, username, password):
+        
+        api = slumber.API(self.base_url, auth=HTTPDigestAuth(username, password))
+        
+        if not self._api_endpoint:
+            raise NotImplementedError("Subclass must specify api endpoint")
+        
+        if not self._incoming_table_class:
+            raise NotImplementedError("Subclass must specify incoming table class")
+        
+        if self._api_endpoint in ('project_space_metadata', 'web-user'):
+            self.api_call = getattr(api, self._api_endpoint)
+        else:
+            raise NotImplementedError("Don't know how to fetch %s from API" % self._api_endpoint)
+        
+        super(HQAdminAPIExtractor, self).__init__(self._incoming_table_class)
+        
+    def do_extract(self):
+        rec_data = self.api_call.get()
+        next_page = rec_data['meta']['next']
+        rec_objects = rec_data['objects']
+        
+        while next_page:
+            rec_data = self.api_call.get(offset=rec_data['meta']['offset'] + rec_data['meta']['limit'] , limit = (self._limit if self._limit else rec_data['meta']['limit']))
+            next_page = rec_data['meta']['next']
+            rec_objects.extend(rec_data['objects'])
+            
+        self.save_incoming(rec_objects)
+        
+    def save_incoming(self, rec_objects):
+        raise NotImplementedError('Subclass must implement save_incoming')
+    
+    def do_cleanup(self):
+        update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.imported == False) | (self._incoming_table_class.imported >> None))
+        rows = update_q.execute()
+        logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
+
+class WebuserAdminAPIExtractor(HQAdminAPIExtractor):
+    
+    _incoming_table_class = IncomingWebUser
+    _api_endpoint = 'web-user'
+    _limit = 100
+    
+    def __init__(self, username, password):
+        
+        super(WebuserAdminAPIExtractor, self).__init__(username, password)
+        
+    def save_incoming(self, rec_objects):
+        inc_web_users = []
+        for obj in rec_objects:
+            obj['api_id'] = obj['id']
+            obj.pop('id', None) # don't keep the ID in or it will try to set the autogenerated db id
+            obj['phone_numbers'] = ','.join(obj['phone_numbers'])
+            
+            inc_domains = obj['domains']
+            obj.pop('domains', None) 
+            if not inc_domains:
+                obj['domain'] = None
+                inc_web_users.append(obj)
+            else:
+                
+                for domain in inc_domains:
+                    obj.update({'domain':domain})
+                    inc_web_users.append(obj)
+        
+        deduped = [dict(t) for t in set([tuple(d.items()) for d in inc_web_users])]
+        self._incoming_table_class.insert_many(deduped).execute()
+    
 class ExcelExtractor(Extractor):
     '''
     An extractor for excel files. 
@@ -565,5 +642,4 @@ class SalesforceExtractor(Extractor):
         delete_q = self._incoming_table_class.delete()
         rows = delete_q.execute()
         logger.info('Deleted %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
-
     

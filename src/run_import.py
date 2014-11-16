@@ -18,7 +18,7 @@ from dimagi_data_platform.extractors import ExcelExtractor, \
     CommCareExportUserExtractor, CommCareExportDeviceLogExtractor, \
     CommCareExportWebUserExtractor, \
     CommCareSlumberFormDefExtractor, CommCareExportExtractor, \
-    SalesforceExtractor
+    SalesforceExtractor, HQAdminAPIExtractor, WebuserAdminAPIExtractor
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingForm, \
     IncomingCases, IncomingDeviceLog
@@ -52,47 +52,45 @@ def setup():
     incoming_data_tables.create_missing_tables()
     data_warehouse_db.create_missing_tables()
     
-def update_hq_admin_data():
+def update_hq_admin_data(username, password):
     '''
     update domains, form definitions, and anything else that is not extracted per-domain from APIs
     '''
-    importers = []
-    importers.append(ExcelExtractor(IncomingDomain, "domains.xlsx"))
-    importers.append(ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx"))
-    importers.append(ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx"))
+    webuser_extractor = WebuserAdminAPIExtractor(username,password)
+    domain_annotation_extractor = ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx")
+    form_annotation_extractor = ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx")
+    extractors = [webuser_extractor,domain_annotation_extractor,form_annotation_extractor]
     
-    for importer in importers:
-        importer.do_extract()
+    for extractor in extractors:
+        extractor.do_extract()
     
-    table_updaters = []
-    table_updaters.append(DomainLoader())
-        
-    for table_updater in table_updaters:
-        table_updater.do_load()
-        
-    for importer in importers:
-            importer.do_cleanup()
-
+    domain_loader = DomainLoader()
+    load_and_cleanup(domain_loader,domain_annotation_extractor)
+    
+    webuser_loader = WebUserLoader()
+    load_and_cleanup(webuser_loader,webuser_extractor)
+    
 @db.commit_on_success
-def load_and_cleanup(loader, extractor):
+def load_and_cleanup(loader, *extractors):
     loader.do_load()
     
-    if extractor:
+    for extractor in extractors:
         extractor.do_cleanup()
                 
-def update_for_domain(dname, password, incremental):
+def update_for_domain(dname, username, password, incremental):
     d = Domain.get(name=dname)
     
     case_extractor = CommCareExportCaseExtractor(dname, incremental)
     form_extractor = CommCareExportFormExtractor(dname, incremental)
     user_extractor = CommCareExportUserExtractor(dname)
+    archived_user_extractor = CommCareExportUserExtractor(dname, archived = True)
     webuser_extractor = CommCareExportWebUserExtractor(dname)
     devicelog_extractor = CommCareExportDeviceLogExtractor(dname)
     formdef_extractor = CommCareSlumberFormDefExtractor('v0.5', dname, conf.CC_USER, password)
     
-    extracters = [case_extractor,form_extractor,user_extractor,webuser_extractor,formdef_extractor, devicelog_extractor]
+    extracters = [case_extractor,form_extractor,user_extractor,archived_user_extractor,webuser_extractor,formdef_extractor, devicelog_extractor]
     logger.info('TIMESTAMP starting commcare export for domain %s' % d.name)
-    api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(conf.CC_USER, password)
+    api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(username, password)
     
     for extracter in extracters:
         if (isinstance(extracter, CommCareExportExtractor)):
@@ -103,11 +101,11 @@ def update_for_domain(dname, password, incremental):
     
     logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
     # these loaders should run even if there are no new forms, cases or device logs
-    user_loader = UserLoader(dname)
-    load_and_cleanup(user_loader,user_extractor)
+    user_loader = UserLoader(dname,api_version='v0.5',username=conf.CC_USER, password=password)
+    load_and_cleanup(user_loader,user_extractor, user_extractor)
     
     app_loader = ApplicationLoader(dname)
-    load_and_cleanup(app_loader,None) # don't clean up yet, formdef_loader uses the same incoming table
+    load_and_cleanup(app_loader) # don't clean up yet, formdef_loader uses the same incoming table
     formdef_loader = FormDefLoader(dname)
     load_and_cleanup(formdef_loader,formdef_extractor)
     
@@ -117,34 +115,34 @@ def update_for_domain(dname, password, incremental):
     cases_to_import = IncomingCases.get_unimported(dname).count()
     if (cases_to_import > 0):
         logger.info('We have %d cases to import' % cases_to_import)
-        case_loader = CasesLoader(dname)
+        case_loader = CasesLoader(dname, user_loader)
         load_and_cleanup(case_loader,case_extractor)
         
     forms_to_import = IncomingForm.get_unimported(dname).count()    
     if (forms_to_import > 0):
         logger.info('We have %d forms to import' % forms_to_import)
-        form_loader = FormLoader(dname)
-        load_and_cleanup(form_loader,None)
+        form_loader = FormLoader(dname, user_loader)
+        load_and_cleanup(form_loader)
         
         caseevent_loader = CaseEventLoader(dname)
         load_and_cleanup(caseevent_loader,form_extractor)
     
     visit_loader = VisitLoader(dname, regenerate_all=(not incremental))
-    load_and_cleanup(visit_loader, None)
+    load_and_cleanup(visit_loader)
         
     device_logs_to_import = IncomingDeviceLog.get_unimported(dname).count()
     if (device_logs_to_import > 0):
         logger.info('We have %d device log entries to import' % device_logs_to_import)
-        devicelog_loader = DeviceLogLoader(dname)
+        devicelog_loader = DeviceLogLoader(dname, user_loader)
         load_and_cleanup(devicelog_loader,devicelog_extractor)
             
-def update_for_domains(domainlist, password, incremental = True):
+def update_for_domains(domainlist, username, password, incremental = True):
     '''
     update per-domain data for domains in domainlist, using given HQ password and username specified in config_sys.json for API calls.
     '''   
     for dname in domainlist:
         try:
-            update_for_domain(dname, password, incremental)
+            update_for_domain(dname, username, password, incremental)
                 
         except Exception, e:
                 logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % dname)
@@ -163,18 +161,18 @@ def main():
         logger.info('TIMESTAMP starting run %s' % datetime.datetime.now())
         setup()
         
-        
+        username = conf.CC_USER
         password = getpass.getpass()
         
         logger.info('TIMESTAMP updating hq admin data - domains, forms definitions %s' % datetime.datetime.now())
-        update_hq_admin_data()
+        update_hq_admin_data(username, password)
         domain_list = get_domains(conf.RUN_CONF_JSON)
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
-        update_for_domains(domain_list, password, incremental = False)
+        update_for_domains(domain_list, username, password, incremental = False)
         
-        update_from_salesforce()
+        #update_from_salesforce()
     
 if __name__ == '__main__':
     main()

@@ -37,8 +37,11 @@ class BaseDomainLinkedModel(BaseModel):
     
     @classmethod
     def get_unimported(cls, dname):
-        return cls.select().where((cls.domain == dname) & ((cls.imported == False) | (cls.imported >> None)))
-        
+        if dname:
+            return cls.select().where((cls.domain == dname) & ((cls.imported == False) | (cls.imported >> None)))
+        else:
+            return cls.select().where((cls.imported == False) | (cls.imported >> None))
+
 models = []
 
 class IncomingDomain(BaseModel):
@@ -112,6 +115,10 @@ class IncomingUser(BaseDomainLinkedModel):
     email = CharField(db_column='email', max_length=255, null=True)
     groups = TextField(db_column='groups', null=True)
     phone_numbers= TextField(db_column='phone_numbers',  null=True)
+    completed_last_30 = IntegerField(null=True)
+    submitted_last_30 = IntegerField(null=True)
+    deactivated = BooleanField(null=True)
+    deleted = BooleanField(null=True)
     user_data = TextField(db_column='user_data',  null=True)
     
     class Meta:

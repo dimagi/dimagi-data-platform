@@ -34,10 +34,11 @@ alter table incoming_users add column submitted_last_30 integer;
 alter table incoming_users add column deactivated boolean;
 alter table incoming_users add column deleted boolean;
 
---insert into mobile_user (select id, groups from users where user_id not in (select user_id from web_user_old) and id in (select new_id from tmp_user_mapping));
---insert into mobile_user_domain(mobile_user_pk, domain_id) (select new_id, domain_id from tmp_user_mapping where user_id not in (select user_id from web_user_old) 
---and username is not null
---group by new_id, domain_id);
+insert into mobile_user (user_pk, groups, deleted, deactivated) (select id, groups, false, false from users 
+where user_id not in (select user_id from web_user_old) and id in (select new_id from tmp_user_mapping) and username is not null);
+insert into mobile_user_domain(mobile_user_pk, domain_id) (select new_id, domain_id from tmp_user_mapping where user_id not in (select user_id from web_user_old)
+and new_id in (select user_pk from mobile_user)
+group by new_id, domain_id);
 
 insert into web_user (select id from users where user_id in (select user_id from web_user_old) and id in (select new_id from tmp_user_mapping));
 insert into web_user_domain(web_user_pk, domain_id, is_admin, webuser_role, resource_uri) (select new_id, tmp_user_mapping.domain_id, is_admin, webuser_role, resource_uri 

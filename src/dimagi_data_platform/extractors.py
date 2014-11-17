@@ -488,7 +488,7 @@ class HQAdminAPIExtractor(Extractor):
             rec_data = self.api_call.get(offset=rec_data['meta']['offset'] + rec_data['meta']['limit'] , limit = (self._limit if self._limit else rec_data['meta']['limit']))
             next_page = rec_data['meta']['next']
             rec_objects.extend(rec_data['objects'])
-            
+        
         self.save_incoming(rec_objects)
         
     def save_incoming(self, rec_objects):
@@ -530,7 +530,7 @@ class ProjectSpaceAdminAPIExtractor(HQAdminAPIExtractor):
     
     def __init__(self, username, password):
         
-        super(WebuserAdminAPIExtractor, self).__init__(username, password)
+        super(ProjectSpaceAdminAPIExtractor, self).__init__(username, password)
         
     def save_incoming(self, rec_objects):
         for obj in rec_objects:

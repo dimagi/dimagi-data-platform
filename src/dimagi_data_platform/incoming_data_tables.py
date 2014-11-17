@@ -47,8 +47,8 @@ models = []
 
 class IncomingDomain(BaseModel):
     
-    attributes = HStoreField()
-    api_json = JSONField()
+    attributes = HStoreField(null=True)
+    api_json = JSONField(null=True)
 
     class Meta:
         db_table = 'incoming_domain'

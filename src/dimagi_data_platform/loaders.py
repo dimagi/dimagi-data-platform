@@ -542,7 +542,7 @@ class FormLoader(Loader):
         insert_dicts = []
         
         for incform in incform_q.iterator():
-            if incform.form not in existing_form_ids:
+            if incform.form and incform.form not in existing_form_ids:
                 if not incform.user in user_id_dict:
                     logger.warn("while inserting form with ID %s for domain %s couldn't find user with user ID %s" % (incform.form, incform.domain, incform.user))
                     new_id = self.user_loader.create_missing(incform.user)

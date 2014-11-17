@@ -170,9 +170,9 @@ def main():
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
-        update_for_domains(domain_list, username, password, incremental = False)
+        update_for_domains(domain_list, username, password, incremental = True)
         
-        #update_from_salesforce()
+        update_from_salesforce()
     
 if __name__ == '__main__':
     main()

@@ -54,9 +54,15 @@ class Domain(BaseModel):
     business_unit = CharField(max_length=255, null=True)
     active =  BooleanField(null=True)
     test =  BooleanField(null=True)
-    last_hq_import = DateTimeField(null=True)
     
-    attributes = HStoreField(null=True)
+    # properties from project space metadata API
+    billing_properties = JSONField(null=True)
+    calculated_properties = JSONField(null=True)
+    domain_properties = JSONField(null=True)
+    
+    # extra attributes from annotations
+    extra_attributes = HStoreField(db_column='extra_attributes', null=True)
+    
     class Meta:
         db_table = 'domain'
 models.append(Domain)

@@ -108,11 +108,11 @@ class DomainLoader(Loader):
                 continue
             
             attrs = row.attributes
-            if not 'Project' in attrs:
-                logger.error('Must have Project to save domain, but we only have  %s' % attrs)
+            if not 'Domain name' in attrs:
+                logger.error('Must have Domain name to save domain, but we only have  %s' % attrs)
                 continue
             else:
-                dname = attrs['Project']
+                dname = attrs['Domain name']
                 
             try:
                 domain = Domain.get(name=dname)
@@ -133,7 +133,7 @@ class DomainLoader(Loader):
             if 'Active?' in attrs:
                 domain.active = (attrs['Active?'].lower() == "true")
                 
-            domain.attributes = attrs
+            domain.extra_attributes = attrs
             
             sector_name_hq = [attrs["Sector"]] if "Sector" in attrs else []
             sector_names_annotations = [k.replace('Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sector_') & (v == 'Yes'))]
@@ -156,8 +156,10 @@ class DomainLoader(Loader):
                 logger.warn('IncomingDomain entry with no data for api_json  %s' % row)
                 continue
             
-            api_data = json.loads(row.api_json)
-            print api_data
+            api_data = row.api_json
+            billing_properties = api_data['billing_properties']
+            calculated_properties = api_data['calculated_properties']
+            domain_properties = api_data['domain_properties']
     
     def do_load(self):
         self.load_api_data()

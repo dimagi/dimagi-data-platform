@@ -25,7 +25,7 @@ from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm, IncomingFormDef, IncomingUser, IncomingWebUser, \
     IncomingDeviceLog, IncomingSalesforceRecord
-from dimagi_data_platform.utils import break_into_chunks
+from dimagi_data_platform.utils import break_into_chunks, dict_flatten
 
 
 logger = logging.getLogger(__name__)
@@ -101,59 +101,85 @@ class DomainLoader(Loader):
                 ds = DomainSubsector(domain=domain, subsector=sub)
                 ds.save()
     
-    def do_load(self):
-        
-        hq_domain_list = IncomingDomain.get_unimported()
+    def load_annotations(self):
         annotations = IncomingDomainAnnotation.get_unimported()
-        
-        for row in hq_domain_list:
+        for row in annotations:
+            if not row.attributes:
+                continue
+            
             attrs = row.attributes
-            if not 'Project' in attrs:
-                logger.warn('Must have Project to save domain, but we only have  %s' % attrs)
+            if not 'Domain name' in attrs:
+                logger.error('Must have Domain name to save domain, but we only have  %s' % attrs)
+                continue
             else:
-                dname = attrs['Project']
+                dname = attrs['Domain name']
                 
-            if dname not in self._first_col_names_to_skip:
+            try:
+                domain = Domain.get(name=dname)
+            except Domain.DoesNotExist:
+                logger.error('Cannot save domain annotations, no domain named  %s' % dname)
+                continue
+            
+            domain.organization = attrs['Organization'] if 'Organization' in attrs else None
+            domain.country = attrs['Deployment Country'] if 'Deployment Country' in attrs else None
+            domain.services = attrs['Services'] if 'Services' in attrs else None
+            domain.project_state = attrs['Project State'] if 'Project State' in attrs else None
+            domain.business_unit = attrs['Business unit'] if 'Business unit' in attrs else None
+            if 'Test Project?' in attrs:
+                if (attrs['Test Project?'].lower() == "true"):
+                    domain.test = True
+                elif (attrs['Test Project?'].lower() == "false"):
+                    domain.test = False
+            if 'Active?' in attrs:
+                domain.active = (attrs['Active?'].lower() == "true")
                 
-                my_annotations = annotations.select().where(IncomingDomainAnnotation.attributes.contains({'Domain name': dname}))
-                try:
-                    attrs.update(my_annotations.get().attributes)
-                except IncomingDomainAnnotation.DoesNotExist:
-                    pass
+            domain.extra_attributes = attrs
+            
+            sector_name_hq = [attrs["Sector"]] if "Sector" in attrs else []
+            sector_names_annotations = [k.replace('Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sector_') & (v == 'Yes'))]
+            sector_names = sector_name_hq + sector_names_annotations
+            sector_names = [s for s in sector_names if (s is not None and not (s == "") and not (s == "No info"))]
+            
+            subsector_name_hq = [attrs["Sub-Sector"]] if "Sub-Sector" in attrs else []
+            subsector_names_annotations = [k.replace('Sub-Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sub-Sector_') & (v == 'Yes'))]
+            subsector_names = subsector_name_hq + subsector_names_annotations
+            subsector_names = [sb for sb in subsector_names if (sb is not None and not (sb == "") and not (sb == "No info"))]
+            
+            self.update_sectors(domain, sector_names, subsector_names)
+            
+            domain.save()
+            
+    def load_api_data(self):
+        hq_domain_list = IncomingDomain.get_unimported()
+        for row in hq_domain_list:
+            if not row.api_json:
+                logger.warn('IncomingDomain entry with no data for api_json  %s' % row)
+                continue
+            api_data = row.api_json
+            dname = api_data['domain_properties']['name']
+            try:
+                domain = Domain.get(name=dname)
+            except Domain.DoesNotExist:
+                logger.info('Adding new domain named  %s' % dname)
+                domain = Domain.create(name=dname)
                 
-                try:
-                    domain = Domain.get(name=dname)
-                except Domain.DoesNotExist:
-                    domain = Domain.create(name=dname)
+            domain.organization = api_data['domain_properties']['organization']
+            domain.countries = api_data['domain_properties']['deployment']['countries']
+            domain.services = api_data['domain_properties']['internal']['services']
+            domain.project_state = api_data['domain_properties']['internal']['project_state']
+            domain.active =  api_data['domain_properties']['is_active']
+            domain.test =  api_data['domain_properties']['is_test']
+            
+            domain.billing_properties = dict_flatten(api_data['billing_properties'])
+            domain.calculated_properties = dict_flatten(api_data['calculated_properties'])
+            domain.domain_properties = dict_flatten(api_data['domain_properties'])
+            
+            domain.save()
+    
+    def do_load(self):
+        self.load_api_data()
+        self.load_annotations()
                 
-                domain.organization = attrs['Organization'] if 'Organization' in attrs else None
-                domain.country = attrs['Deployment Country'] if 'Deployment Country' in attrs else None
-                domain.services = attrs['Services'] if 'Services' in attrs else None
-                domain.project_state = attrs['Project State'] if 'Project State' in attrs else None
-                domain.business_unit = attrs['Business unit'] if 'Business unit' in attrs else None
-                if 'Test Project?' in attrs:
-                    if (attrs['Test Project?'].lower() == "true"):
-                        domain.test = True
-                    elif (attrs['Test Project?'].lower() == "false"):
-                        domain.test = False
-                if 'Active?' in attrs:
-                    domain.active = (attrs['Active?'].lower() == "true")
-                    
-                domain.attributes = attrs
-                
-                sector_name_hq = [attrs["Sector"]] if "Sector" in attrs else []
-                sector_names_annotations = [k.replace('Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sector_') & (v == 'Yes'))]
-                sector_names = sector_name_hq + sector_names_annotations
-                sector_names = [s for s in sector_names if (s is not None and not (s == "") and not (s == "No info"))]
-                
-                subsector_name_hq = [attrs["Sub-Sector"]] if "Sub-Sector" in attrs else []
-                subsector_names_annotations = [k.replace('Sub-Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sub-Sector_') & (v == 'Yes'))]
-                subsector_names = subsector_name_hq + subsector_names_annotations
-                subsector_names = [sb for sb in subsector_names if (sb is not None and not (sb == "") and not (sb == "No info"))]
-                
-                self.update_sectors(domain, sector_names, subsector_names)
-                
-                domain.save()
                 
 class ApplicationLoader(Loader):
     '''

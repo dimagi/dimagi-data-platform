@@ -25,7 +25,7 @@ from dimagi_data_platform.data_warehouse_db import Domain, DeviceLog, \
     HQExtractLog
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
     IncomingCases, IncomingUser, IncomingDeviceLog, IncomingWebUser, \
-    IncomingFormDef, IncomingSalesforceRecord
+    IncomingFormDef, IncomingSalesforceRecord, IncomingDomain
 from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 
@@ -483,12 +483,12 @@ class HQAdminAPIExtractor(Extractor):
         rec_data = self.api_call.get()
         next_page = rec_data['meta']['next']
         rec_objects = rec_data['objects']
-        
+
         while next_page:
             rec_data = self.api_call.get(offset=rec_data['meta']['offset'] + rec_data['meta']['limit'] , limit = (self._limit if self._limit else rec_data['meta']['limit']))
             next_page = rec_data['meta']['next']
             rec_objects.extend(rec_data['objects'])
-            
+
         self.save_incoming(rec_objects)
         
     def save_incoming(self, rec_objects):
@@ -529,6 +529,20 @@ class WebuserAdminAPIExtractor(HQAdminAPIExtractor):
         
         deduped = [dict(t) for t in set([tuple(d.items()) for d in inc_web_users])]
         self._incoming_table_class.insert_many(deduped).execute()
+                    
+class ProjectSpaceAdminAPIExtractor(HQAdminAPIExtractor):
+    
+    _incoming_table_class = IncomingWebUser
+    _api_endpoint = 'project_space_metadata'
+    _limit = 20
+    
+    def __init__(self, username, password):
+        
+        super(ProjectSpaceAdminAPIExtractor, self).__init__(username, password)
+        
+    def save_incoming(self, rec_objects):
+        for obj in rec_objects:
+            IncomingDomain.create(api_json=obj)
     
 class ExcelExtractor(Extractor):
     '''

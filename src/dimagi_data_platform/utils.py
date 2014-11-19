@@ -93,3 +93,15 @@ def run_proccess_and_log(cmd, args_list):
         logger.info(stdout)
     if stderr:
         logger.error(stderr)
+        
+def dict_flatten(d, delim='.', prefix=[]):
+    def pairs(d, prefix):
+        def flatten(k, v):
+            if isinstance(v, dict):
+                return pairs(v, k)
+            else:
+                return [(k, v)]
+        for k, v in d.iteritems():
+            for e in flatten(prefix + [k], v):
+                yield e
+    return dict((delim.join(k), v) for k, v in pairs(d, prefix))

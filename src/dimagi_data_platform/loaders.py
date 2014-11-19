@@ -71,12 +71,6 @@ class DomainLoader(Loader):
         super(DomainLoader, self).__init__()
         
     def update_sectors(self, domain, sector_list, subsector_list):
-
-        dq_sec = DomainSector.delete().where(DomainSector.domain == domain)
-        dq_sec.execute()
-        
-        dq_subsec = DomainSubsector.delete().where(DomainSubsector.domain == domain)
-        dq_subsec.execute()
         
         for secname in sector_list:
             try:
@@ -136,15 +130,11 @@ class DomainLoader(Loader):
                 
             domain.attributes.update(attrs)
             
-            sector_name_hq = [attrs["Sector"]] if "Sector" in attrs else []
             sector_names_annotations = [k.replace('Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sector_') & (v == 'Yes'))]
-            sector_names = sector_name_hq + sector_names_annotations
-            sector_names = [s for s in sector_names if (s is not None and not (s == "") and not (s == "No info"))]
+            sector_names = [s for s in sector_names_annotations if (s is not None and not (s == "") and not (s == "No info"))]
             
-            subsector_name_hq = [attrs["Sub-Sector"]] if "Sub-Sector" in attrs else []
             subsector_names_annotations = [k.replace('Sub-Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sub-Sector_') & (v == 'Yes'))]
-            subsector_names = subsector_name_hq + subsector_names_annotations
-            subsector_names = [sb for sb in subsector_names if (sb is not None and not (sb == "") and not (sb == "No info"))]
+            subsector_names = [sb for sb in subsector_names_annotations if (sb is not None and not (sb == "") and not (sb == "No info"))]
             
             self.update_sectors(domain, sector_names, subsector_names)
             
@@ -170,6 +160,16 @@ class DomainLoader(Loader):
             domain.project_state = api_data['domain_properties']['internal']['project_state']
             domain.active =  api_data['domain_properties']['is_active']
             domain.test =  api_data['domain_properties']['is_test']
+            
+            # delete all sector information for this domain
+            dq_sec = DomainSector.delete().where(DomainSector.domain == domain)
+            dq_sec.execute()
+            dq_subsec = DomainSubsector.delete().where(DomainSubsector.domain == domain)
+            dq_subsec.execute()
+            
+            sector = api_data['domain_properties']['internal']['area']
+            sub_sector = api_data['domain_properties']['internal']['sub_area']
+            self.update_sectors(domain, [sector], [sub_sector])
             
             # add billing prefix only, domain properties prefix is nothing, calculate properties all have cpp_
             billing_properties = dict_flatten(api_data['billing_properties'])

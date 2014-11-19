@@ -57,20 +57,22 @@ def update_hq_admin_data(username, password):
     '''
     update domains, form definitions, and anything else that is not extracted per-domain from APIs
     '''
-    webuser_extractor = WebuserAdminAPIExtractor(username,password)
-    domain_extractor = ProjectSpaceAdminAPIExtractor(username,password)
+    #webuser_extractor = WebuserAdminAPIExtractor(username,password)
+    #domain_extractor = ProjectSpaceAdminAPIExtractor(username,password)
     domain_annotation_extractor = ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx")
     form_annotation_extractor = ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx")
-    extractors = [domain_extractor,webuser_extractor, domain_annotation_extractor,form_annotation_extractor]
+    extractors = [domain_annotation_extractor,form_annotation_extractor]
+    #extractors = [domain_extractor,webuser_extractor, domain_annotation_extractor,form_annotation_extractor]
 
     for extractor in extractors:
         extractor.do_extract()
     
     domain_loader = DomainLoader()
-    load_and_cleanup(domain_loader,domain_extractor, domain_annotation_extractor)
+    load_and_cleanup(domain_loader, domain_annotation_extractor)
+    #load_and_cleanup(domain_loader,domain_extractor, domain_annotation_extractor)
     
-    webuser_loader = WebUserLoader()
-    load_and_cleanup(webuser_loader,webuser_extractor)
+    #webuser_loader = WebUserLoader()
+    #load_and_cleanup(webuser_loader,webuser_extractor)
     
 @db.commit_on_success
 def load_and_cleanup(loader, *extractors):

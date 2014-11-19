@@ -55,13 +55,8 @@ class Domain(BaseModel):
     active =  BooleanField(null=True)
     test =  BooleanField(null=True)
     
-    # properties from project space metadata API
-    billing_properties = JSONField(null=True)
-    calculated_properties = JSONField(null=True)
-    domain_properties = JSONField(null=True)
-    
     # extra attributes from annotations
-    extra_attributes = HStoreField(db_column='extra_attributes', null=True)
+    attributes = HStoreField(db_column='attributes', null=True)
     
     class Meta:
         db_table = 'domain'

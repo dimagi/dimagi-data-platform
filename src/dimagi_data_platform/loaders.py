@@ -169,7 +169,8 @@ class DomainLoader(Loader):
             
             sector = api_data['domain_properties']['internal']['area']
             sub_sector = api_data['domain_properties']['internal']['sub_area']
-            self.update_sectors(domain, [sector], [sub_sector])
+            if sector or sub_sector:
+                self.update_sectors(domain, [sector], [sub_sector])
             
             # add billing prefix only, domain properties prefix is nothing, calculate properties all have cpp_
             billing_properties = dict_flatten(api_data['billing_properties'])

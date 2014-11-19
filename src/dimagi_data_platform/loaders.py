@@ -25,7 +25,7 @@ from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm, IncomingFormDef, IncomingUser, IncomingWebUser, \
     IncomingDeviceLog, IncomingSalesforceRecord
-from dimagi_data_platform.utils import break_into_chunks
+from dimagi_data_platform.utils import break_into_chunks, dict_flatten
 
 
 logger = logging.getLogger(__name__)
@@ -155,11 +155,26 @@ class DomainLoader(Loader):
             if not row.api_json:
                 logger.warn('IncomingDomain entry with no data for api_json  %s' % row)
                 continue
-            
             api_data = row.api_json
-            billing_properties = api_data['billing_properties']
-            calculated_properties = api_data['calculated_properties']
-            domain_properties = api_data['domain_properties']
+            dname = api_data['domain_properties']['name']
+            try:
+                domain = Domain.get(name=dname)
+            except Domain.DoesNotExist:
+                logger.info('Adding new domain named  %s' % dname)
+                domain = Domain.create(name=dname)
+                
+            domain.organization = api_data['domain_properties']['organization']
+            domain.countries = api_data['domain_properties']['deployment']['countries']
+            domain.services = api_data['domain_properties']['internal']['services']
+            domain.project_state = api_data['domain_properties']['internal']['project_state']
+            domain.active =  api_data['domain_properties']['is_active']
+            domain.test =  api_data['domain_properties']['is_test']
+            
+            domain.billing_properties = dict_flatten(api_data['billing_properties'])
+            domain.calculated_properties = dict_flatten(api_data['calculated_properties'])
+            domain.domain_properties = dict_flatten(api_data['domain_properties'])
+            
+            domain.save()
     
     def do_load(self):
         self.load_api_data()

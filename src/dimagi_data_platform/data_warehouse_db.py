@@ -48,7 +48,7 @@ class Domain(BaseModel):
     id = PrimaryKeyField(db_column='id')
     name = CharField(max_length=255, null=True)
     organization = CharField(max_length=255, null=True)
-    country = CharField(max_length=255, null=True)
+    countries = ArrayField(CharField)
     services = CharField(max_length=255, null=True)
     project_state = CharField(max_length=255, null=True)
     business_unit = CharField(max_length=255, null=True)

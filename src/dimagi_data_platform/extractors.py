@@ -483,12 +483,12 @@ class HQAdminAPIExtractor(Extractor):
         rec_data = self.api_call.get()
         next_page = rec_data['meta']['next']
         rec_objects = rec_data['objects']
-        '''
+
         while next_page:
             rec_data = self.api_call.get(offset=rec_data['meta']['offset'] + rec_data['meta']['limit'] , limit = (self._limit if self._limit else rec_data['meta']['limit']))
             next_page = rec_data['meta']['next']
             rec_objects.extend(rec_data['objects'])
-        '''
+
         self.save_incoming(rec_objects)
         
     def save_incoming(self, rec_objects):

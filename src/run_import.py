@@ -57,21 +57,20 @@ def update_hq_admin_data(username, password):
     '''
     update domains, form definitions, and anything else that is not extracted per-domain from APIs
     '''
-    #webuser_extractor = WebuserAdminAPIExtractor(username,password)
+    webuser_extractor = WebuserAdminAPIExtractor(username,password)
     domain_extractor = ProjectSpaceAdminAPIExtractor(username,password)
     domain_annotation_extractor = ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx")
     form_annotation_extractor = ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx")
-    #extractors = [webuser_extractor,domain_extractor domain_annotation_extractor,form_annotation_extractor]
-    extractors = [domain_extractor,domain_annotation_extractor,form_annotation_extractor]
-    
+    extractors = [domain_extractor,webuser_extractor, domain_annotation_extractor,form_annotation_extractor]
+
     for extractor in extractors:
         extractor.do_extract()
     
     domain_loader = DomainLoader()
     load_and_cleanup(domain_loader,domain_extractor, domain_annotation_extractor)
     
-#    webuser_loader = WebUserLoader()
-#    load_and_cleanup(webuser_loader,webuser_extractor)
+    webuser_loader = WebUserLoader()
+    load_and_cleanup(webuser_loader,webuser_extractor)
     
 @db.commit_on_success
 def load_and_cleanup(loader, *extractors):
@@ -173,9 +172,9 @@ def main():
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
-        update_for_domains(domain_list, username, password, incremental = False)
+        update_for_domains(domain_list, username, password, incremental = True)
         
-        #update_from_salesforce()
+        update_from_salesforce()
     
 if __name__ == '__main__':
     main()

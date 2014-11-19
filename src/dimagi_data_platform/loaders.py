@@ -222,7 +222,7 @@ class FormDefLoader(Loader):
 
             else:
                 xmlns = attrs['Form xmlns']
-                app_id = attrs['Application ID'] if attrs['Application ID'] else None
+                app_id = attrs['Application ID'] if 'Application ID' in attrs else None
                 dname = attrs['Domain name']
                 subsector_names = [k.replace('Subsector_', '') for k, v in attrs.iteritems() if (k.startswith('Subsector_') & (v == 'Yes'))]
                 
@@ -403,10 +403,10 @@ class UserLoader(Loader):
             return new_user_id
         else:
             try:
-                u = User.get(user_id=incoming_user.user_id)
+                u = User.get(user_id=user_id)
             except User.DoesNotExist:
-                logger.info('creating new user for user_id %s' % incoming_user.user_id)
-                u = User.create(user_id=incoming_user.user_id)
+                logger.info('creating new user for user_id %s' % user_id)
+                u = User.create(user_id=user_id)
             return u.id
         
     def create_or_update_user(self,incoming_user): 
@@ -689,7 +689,7 @@ class VisitLoader(Loader):
         
         time_start = min(visited_forms, key=lambda x : x.time_start).time_start
         time_end = max(visited_forms, key=lambda x : x.time_end).time_end
-        v = Visit.create(user=user, time_start=time_start, time_end=time_end)
+        v = Visit.create(user=user, time_start=time_start, time_end=time_end, domain = self.domain)
         
         ids = [f.id for f in visited_forms]
         uq = Form.update(visit=v).where(Form.id << ids)
@@ -704,6 +704,10 @@ class VisitLoader(Loader):
         user_id_cur = Form._meta.database.execute_sql('select id from users where id in '
                                                     '(select user_id from form where domain_id = %d )' % self.domain.id)
         user_id_list = [item[0] for item in user_id_cur.fetchall()]
+        
+        if not user_id_list:
+            logger.warn('No users to generate visits for in for domain %s ' % self.domain.name)
+            return
         users = User.select().where(User.id << user_id_list).order_by(User.user_id)
         
         # dict with case event ids as keys, case_ids as values

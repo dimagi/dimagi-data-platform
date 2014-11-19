@@ -105,3 +105,14 @@ def dict_flatten(d, delim='.', prefix=[]):
             for e in flatten(prefix + [k], v):
                 yield e
     return dict((delim.join(k), v) for k, v in pairs(d, prefix))
+
+def dict_str_vals(d):
+    def str_vals(d):
+        for k, v in d.iteritems():
+            if type(v) is list:
+                quoted_list_str = ','.join(['"%s"'% val for val in v])
+                yield (k,quoted_list_str)
+            else:
+                yield (k,'%s'%v)
+    return dict((k, v) for k, v in str_vals(dict_flatten(d)) if v is not None)
+

@@ -25,7 +25,8 @@ from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm, IncomingFormDef, IncomingUser, IncomingWebUser, \
     IncomingDeviceLog, IncomingSalesforceRecord
-from dimagi_data_platform.utils import break_into_chunks, dict_flatten
+from dimagi_data_platform.utils import break_into_chunks, dict_flatten, \
+    dict_str_vals
 
 
 logger = logging.getLogger(__name__)
@@ -133,7 +134,7 @@ class DomainLoader(Loader):
             if 'Active?' in attrs:
                 domain.active = (attrs['Active?'].lower() == "true")
                 
-            domain.extra_attributes = attrs
+            domain.attributes.update(attrs)
             
             sector_name_hq = [attrs["Sector"]] if "Sector" in attrs else []
             sector_names_annotations = [k.replace('Sector_', '') for k, v in attrs.iteritems() if (k.startswith('Sector_') & (v == 'Yes'))]
@@ -170,10 +171,12 @@ class DomainLoader(Loader):
             domain.active =  api_data['domain_properties']['is_active']
             domain.test =  api_data['domain_properties']['is_test']
             
-            domain.billing_properties = dict_flatten(api_data['billing_properties'])
-            domain.calculated_properties = dict_flatten(api_data['calculated_properties'])
-            domain.domain_properties = dict_flatten(api_data['domain_properties'])
-            
+            # add billing prefix only, domain properties prefix is nothing, calculate properties all have cpp_
+            billing_properties = dict_flatten(api_data['billing_properties'])
+            domain.attributes = dict(('billing_%s'% key, value) for (key, value) in billing_properties.iteritems())
+            domain.attributes.update(dict_flatten(api_data['calculated_properties']))
+            domain.attributes.update(dict_flatten(api_data['domain_properties']))
+            domain.attributes = dict_str_vals(domain.attributes)
             domain.save()
     
     def do_load(self):

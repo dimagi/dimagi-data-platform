@@ -158,7 +158,7 @@ class DomainLoader(Loader):
             domain.countries = api_data['domain_properties']['deployment']['countries']
             domain.services = api_data['domain_properties']['internal']['services']
             domain.project_state = api_data['domain_properties']['internal']['project_state']
-            domain.active =  api_data['domain_properties']['is_active']
+            domain.active =  api_data['domain_properties']['cp_is_active']
             domain.test =  api_data['domain_properties']['is_test']
             
             # delete all sector information for this domain

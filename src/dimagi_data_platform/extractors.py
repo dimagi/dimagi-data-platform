@@ -449,7 +449,7 @@ class CommCareSlumberFormDefExtractor(Extractor):
             app_data = self.api.application.get(offset=app_data['meta']['offset'] + app_data['meta']['limit'] , limit = app_data['meta']['limit'])
             next_page = app_data['meta']['next']
             app_objects.extend(app_data['objects'])
-            
+          
         self.__save_formdefs(app_objects)
         
     def do_cleanup(self):
@@ -534,7 +534,7 @@ class ProjectSpaceAdminAPIExtractor(HQAdminAPIExtractor):
     
     _incoming_table_class = IncomingWebUser
     _api_endpoint = 'project_space_metadata'
-    _limit = 20
+    _limit = 50
     
     def __init__(self, username, password):
         

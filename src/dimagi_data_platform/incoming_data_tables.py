@@ -170,6 +170,15 @@ class IncomingFormDef(BaseDomainLinkedModel):
     class Meta:
         db_table = 'incoming_formdef'
 models.append(IncomingFormDef)
+
+class IncomingApplication(BaseDomainLinkedModel):
+    app_id = CharField(db_column='app_id', max_length=255, null=True)
+    app_name = TextField(db_column='app_name', null=True)
+    attributes_json = JSONField()
+    
+    class Meta:
+        db_table = 'incoming_application'
+models.append(IncomingApplication)
         
 class IncomingSalesforceRecord(BaseModel):
     sf_id = TextField()

@@ -41,7 +41,8 @@ class Extractor(object):
         '''
         Constructor
         '''
-        self.engine = sqlalchemy.create_engine(conf.SQLALCHEMY_DB_URL)
+        self._incoming_table_class = _incoming_table_class
+        
         
     @property
     def _get_table_name(self):
@@ -109,7 +110,7 @@ class CommCareExportExtractor(Extractor):
             except HQExtractLog.DoesNotExist:
                 self.since = None
         self._incoming_table_class = incoming_table_class
-        
+        self.engine = sqlalchemy.create_engine(conf.SQLALCHEMY_DB_URL)
         super(CommCareExportExtractor, self).__init__(self._incoming_table_class)
     
     @property
@@ -413,7 +414,39 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
                              Reference('xform_id'), ])))
         return query
     
-class CommCareSlumberFormDefExtractor(Extractor):
+class SlumberExtractor(Extractor):
+    
+    def __init__(self, _incoming_table_class, api_call):
+        self.api_call = api_call
+        super(SlumberExtractor, self).__init__(_incoming_table_class)
+    
+    def api_extract(self):
+        rec_data = self.api_call.get()
+        next_page = rec_data['meta']['next']
+        rec_objects = rec_data['objects']
+        '''
+        while next_page:
+            rec_data = self.api_call.get(offset=rec_data['meta']['offset'] + rec_data['meta']['limit'] , limit = (self._limit if self._limit else rec_data['meta']['limit']))
+            next_page = rec_data['meta']['next']
+            rec_objects.extend(rec_data['objects'])
+        '''
+        return rec_objects
+    
+    def do_extract(self):
+        rec_objects = self.api_extract()
+        self.save_incoming(rec_objects)
+        
+    def save_incoming(self, rec_objects):
+        raise NotImplementedError('Subclass must implement save_incoming')
+    
+    def do_cleanup(self):
+        update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.imported == False) | 
+                                                                          (self._incoming_table_class.imported >> None))
+        rows = update_q.execute()
+        logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
+      
+
+class CommCareSlumberFormDefExtractor(SlumberExtractor):
     '''
     An extractor for application structure data using the CommCare Data APIs
     https://confluence.dimagi.com/display/commcarepublic/Data+APIs
@@ -428,10 +461,11 @@ class CommCareSlumberFormDefExtractor(Extractor):
         '''
         self.domain=domain
         url = "https://www.commcarehq.org/a/%s/api/%s/" % (domain,api_version)
-        self.api = slumber.API(url, auth=HTTPDigestAuth(username, password))
-        super(CommCareSlumberFormDefExtractor, self).__init__(self._incoming_table_class)
+        api = slumber.API(url, auth=HTTPDigestAuth(username, password))
+        api_call = getattr(api, 'application')
+        super(CommCareSlumberFormDefExtractor, self).__init__(self._incoming_table_class, api_call)
         
-    def __save_formdefs(self, app_objects):
+    def save_incoming(self, app_objects):
         for app in app_objects:
             for mod in app['modules']:
                 for form in mod['forms']:
@@ -439,18 +473,6 @@ class CommCareSlumberFormDefExtractor(Extractor):
                     fd = IncomingFormDef(app_id=app["id"], app_name=app["name"], domain=self.domain, case_type=mod["case_type"],form_names=names, form_xmlns = form["xmlns"])
                     fd.formdef_json = json.dumps(form, ensure_ascii=False)
                     fd.save()
-
-    def do_extract(self):
-        app_data = self.api.application.get()
-        next_page = app_data['meta']['next']
-        app_objects = app_data['objects']
-        
-        while next_page:
-            app_data = self.api.application.get(offset=app_data['meta']['offset'] + app_data['meta']['limit'] , limit = app_data['meta']['limit'])
-            next_page = app_data['meta']['next']
-            app_objects.extend(app_data['objects'])
-          
-        self.__save_formdefs(app_objects)
         
     def do_cleanup(self):
         update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.domain == self.domain) 
@@ -458,7 +480,7 @@ class CommCareSlumberFormDefExtractor(Extractor):
         rows = update_q.execute()
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
 
-class HQAdminAPIExtractor(Extractor):
+class HQAdminAPIExtractor(SlumberExtractor):
     
     base_url = 'https://www.commcarehq.org/hq/admin/api/global/'
     
@@ -473,31 +495,12 @@ class HQAdminAPIExtractor(Extractor):
             raise NotImplementedError("Subclass must specify incoming table class")
         
         if self._api_endpoint in ('project_space_metadata', 'web-user'):
-            self.api_call = getattr(api, self._api_endpoint)
+            api_call = getattr(api, self._api_endpoint)
         else:
             raise NotImplementedError("Don't know how to fetch %s from API" % self._api_endpoint)
         
-        super(HQAdminAPIExtractor, self).__init__(self._incoming_table_class)
-        
-    def do_extract(self):
-        rec_data = self.api_call.get()
-        next_page = rec_data['meta']['next']
-        rec_objects = rec_data['objects']
-
-        while next_page:
-            rec_data = self.api_call.get(offset=rec_data['meta']['offset'] + rec_data['meta']['limit'] , limit = (self._limit if self._limit else rec_data['meta']['limit']))
-            next_page = rec_data['meta']['next']
-            rec_objects.extend(rec_data['objects'])
-
-        self.save_incoming(rec_objects)
-        
-    def save_incoming(self, rec_objects):
-        raise NotImplementedError('Subclass must implement save_incoming')
+        super(HQAdminAPIExtractor, self).__init__(self._incoming_table_class, api_call)
     
-    def do_cleanup(self):
-        update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.imported == False) | (self._incoming_table_class.imported >> None))
-        rows = update_q.execute()
-        logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
 
 class WebuserAdminAPIExtractor(HQAdminAPIExtractor):
     

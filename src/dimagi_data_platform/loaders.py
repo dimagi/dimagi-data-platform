@@ -24,7 +24,7 @@ from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector,
 from dimagi_data_platform.incoming_data_tables import IncomingDomain, \
     IncomingDomainAnnotation, IncomingFormAnnotation, IncomingCases, \
     IncomingForm, IncomingFormDef, IncomingUser, IncomingWebUser, \
-    IncomingDeviceLog, IncomingSalesforceRecord
+    IncomingDeviceLog, IncomingSalesforceRecord, IncomingApplication
 from dimagi_data_platform.utils import break_into_chunks, dict_flatten, \
     dict_str_vals
 
@@ -195,7 +195,7 @@ class ApplicationLoader(Loader):
         super(ApplicationLoader, self).__init__()
         
     def do_load(self):
-        for inc in IncomingFormDef.get_unimported(self.domain.name):
+        for inc in IncomingApplication.get_unimported(self.domain.name):
             if not inc.app_id:
                 continue
             
@@ -203,7 +203,10 @@ class ApplicationLoader(Loader):
                 app = Application.get(Application.app_id == inc.app_id, Application.domain == self.domain.id)
             except Application.DoesNotExist:
                 app = Application(app_id=inc.app_id, domain=self.domain.id)
+            
             app.app_name = inc.app_name
+            app.attributes = dict_flatten(inc.attributes_json)
+            app.attributes = dict_str_vals(app.attributes)
             app.save()
                 
 class FormDefLoader(Loader):

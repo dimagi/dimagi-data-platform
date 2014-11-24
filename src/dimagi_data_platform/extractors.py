@@ -25,7 +25,8 @@ from dimagi_data_platform.data_warehouse_db import Domain, DeviceLog, \
     HQExtractLog
 from dimagi_data_platform.incoming_data_tables import IncomingForm, \
     IncomingCases, IncomingUser, IncomingDeviceLog, IncomingWebUser, \
-    IncomingFormDef, IncomingSalesforceRecord, IncomingDomain
+    IncomingFormDef, IncomingSalesforceRecord, IncomingDomain, \
+    IncomingApplication
 from dimagi_data_platform.pg_copy_writer import PgCopyWriter
 
 
@@ -416,20 +417,24 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
     
 class SlumberExtractor(Extractor):
     
-    def __init__(self, _incoming_table_class, api_call):
+    def __init__(self, _incoming_table_class, api_call, kwargs = None):
         self.api_call = api_call
+        self.kwargs = kwargs
         super(SlumberExtractor, self).__init__(_incoming_table_class)
     
     def api_extract(self):
-        rec_data = self.api_call.get()
+        url_params = self.kwargs if self.kwargs else {}
+        rec_data = self.api_call.get(**url_params)
         next_page = rec_data['meta']['next']
         rec_objects = rec_data['objects']
-        '''
+
         while next_page:
-            rec_data = self.api_call.get(offset=rec_data['meta']['offset'] + rec_data['meta']['limit'] , limit = (self._limit if self._limit else rec_data['meta']['limit']))
+            url_params.update({'offset':rec_data['meta']['offset'] + rec_data['meta']['limit'] , 
+                               'limit' : (self._limit if self._limit else rec_data['meta']['limit'])})
+            rec_data = self.api_call.get(**url_params)
             next_page = rec_data['meta']['next']
             rec_objects.extend(rec_data['objects'])
-        '''
+
         return rec_objects
     
     def do_extract(self):
@@ -452,7 +457,8 @@ class CommCareSlumberFormDefExtractor(SlumberExtractor):
     https://confluence.dimagi.com/display/commcarepublic/Data+APIs
     This one doesn't use commcare-export. I couldn't figure out the jsonpath.
     '''
-
+    
+    # actually both IncomingApplication and IncomingFormDef - legacy
     _incoming_table_class = IncomingFormDef
     
     def __init__(self, api_version, domain, username, password):
@@ -462,23 +468,38 @@ class CommCareSlumberFormDefExtractor(SlumberExtractor):
         self.domain=domain
         url = "https://www.commcarehq.org/a/%s/api/%s/" % (domain,api_version)
         api = slumber.API(url, auth=HTTPDigestAuth(username, password))
+        kwargs = {'extras':True}
         api_call = getattr(api, 'application')
-        super(CommCareSlumberFormDefExtractor, self).__init__(self._incoming_table_class, api_call)
+        super(CommCareSlumberFormDefExtractor, self).__init__(self._incoming_table_class, api_call, kwargs)
         
     def save_incoming(self, app_objects):
         for app in app_objects:
-            for mod in app['modules']:
+            module_data = app['modules']
+            del app['modules']
+            inc_app = IncomingApplication.create(app_id=app["id"], app_name=app["name"],attributes_json=app, domain=self.domain)
+            inc_app.save()
+            
+            for mod in module_data:
                 for form in mod['forms']:
                     names = json.dumps(form['name'])
-                    fd = IncomingFormDef(app_id=app["id"], app_name=app["name"], domain=self.domain, case_type=mod["case_type"],form_names=names, form_xmlns = form["xmlns"])
+                    fd = IncomingFormDef(app_id=app["id"], app_name=app["name"], 
+                                         domain=self.domain, case_type=mod["case_type"],form_names=names, form_xmlns = form["xmlns"])
                     fd.formdef_json = json.dumps(form, ensure_ascii=False)
                     fd.save()
         
     def do_cleanup(self):
         update_q = self._incoming_table_class.update(imported=True).where((self._incoming_table_class.domain == self.domain) 
-                                                                          & ((self._incoming_table_class.imported == False) | (self._incoming_table_class.imported >> None)))
+                                                                          & ((self._incoming_table_class.imported == False) 
+                                                                             | (self._incoming_table_class.imported >> None)))
         rows = update_q.execute()
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
+        
+        # also update IncomingApplication, this loader loads both formdefs and apps
+        inc_app_update_q = IncomingApplication.update(imported=True).where((self._incoming_table_class.domain == self.domain) 
+                                                                          & ((self._incoming_table_class.imported == False) 
+                                                                             | (self._incoming_table_class.imported >> None)))
+        rows = inc_app_update_q.execute()
+        logger.info('set imported = True for %d records in incoming data table %s' % (rows, IncomingApplication._meta.db_table))
 
 class HQAdminAPIExtractor(SlumberExtractor):
     

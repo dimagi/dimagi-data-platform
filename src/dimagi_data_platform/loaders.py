@@ -561,7 +561,7 @@ class FormLoader(Loader):
         
     def load_forms(self):
         logger.info('TIMESTAMP starting form table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
-        incform_q = IncomingForm.get_unimported(self.domain.name)
+        incform_q = IncomingForm.get_unimported(self.domain.name).select().where(IncomingForm.record_type == 'form')
         logger.info('Incoming form table has %d records not imported' % incform_q.count())
         
         user_id_q = User.select()
@@ -621,8 +621,10 @@ class CaseEventLoader(Loader):
         logger.info('TIMESTAMP starting case event table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
         ce_q = IncomingForm.select(IncomingForm.form,
                                    IncomingForm.case, IncomingForm.alt_case,
-                                   IncomingForm.closed, IncomingForm.created, IncomingForm.updated).where((IncomingForm.domain == self.domain.name) 
-                                                                                                      & ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
+                                   IncomingForm.closed, IncomingForm.created, 
+                                   IncomingForm.updated).where((IncomingForm.domain == self.domain.name) 
+                                        & (IncomingForm.record_type == 'case_event')
+                                        & ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
         
         cur = CaseEvent._meta.database.execute_sql('select form.form_id, cases.case_id '
                                                 'from form, cases, case_event '

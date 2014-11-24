@@ -103,6 +103,8 @@ class IncomingForm(BaseDomainLinkedModel):
     updated = CharField(max_length=255, null=True)
     user = CharField(db_column='user_id', max_length=255, null=True)
     xmlns = CharField(max_length=255, null=True)
+    
+    record_type = CharField(max_length=255, null=True)
 
     class Meta:
         db_table = 'incoming_form'

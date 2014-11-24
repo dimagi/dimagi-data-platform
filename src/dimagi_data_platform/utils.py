@@ -109,7 +109,9 @@ def dict_flatten(d, delim='.', prefix=[]):
 def dict_str_vals(d):
     def str_vals(d):
         for k, v in d.iteritems():
-            if type(v) is list:
+            if v is None:
+                yield (k,v)
+            elif type(v) is list:
                 quoted_list_str = ','.join(['"%s"'% val for val in v])
                 yield (k,quoted_list_str)
             else:

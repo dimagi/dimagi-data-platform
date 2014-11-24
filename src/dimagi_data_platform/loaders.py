@@ -153,13 +153,12 @@ class DomainLoader(Loader):
             except Domain.DoesNotExist:
                 logger.info('Adding new domain named  %s' % dname)
                 domain = Domain.create(name=dname)
-                
             domain.organization = api_data['domain_properties']['organization']
             domain.countries = api_data['domain_properties']['deployment']['countries']
             domain.services = api_data['domain_properties']['internal']['services']
             domain.project_state = api_data['domain_properties']['internal']['project_state']
-            domain.active =  api_data['domain_properties']['cp_is_active']
-            domain.test =  api_data['domain_properties']['is_test']
+            domain.active = api_data['calculated_properties']['cp_is_active'] if ('calculated_properties' in api_data and 'cp_is_active' in api_data['calculated_properties']) else None
+            domain.test = (api_data['domain_properties']['is_test'] == "true") if (api_data['domain_properties']['is_test'] != "none") else None
             
             # delete all sector information for this domain
             dq_sec = DomainSector.delete().where(DomainSector.domain == domain)
@@ -174,7 +173,7 @@ class DomainLoader(Loader):
             
             # add billing prefix only, domain properties prefix is nothing, calculate properties all have cpp_
             billing_properties = dict_flatten(api_data['billing_properties'])
-            domain.attributes = dict(('billing_%s'% key, value) for (key, value) in billing_properties.iteritems())
+            domain.attributes = dict(('billing_%s' % key, value) for (key, value) in billing_properties.iteritems())
             domain.attributes.update(dict_flatten(api_data['calculated_properties']))
             domain.attributes.update(dict_flatten(api_data['domain_properties']))
             domain.attributes = dict_str_vals(domain.attributes)
@@ -203,7 +202,7 @@ class ApplicationLoader(Loader):
             try:
                 app = Application.get(Application.app_id == inc.app_id, Application.domain == self.domain.id)
             except Application.DoesNotExist:
-                app = Application(app_id = inc.app_id, domain = self.domain.id)
+                app = Application(app_id=inc.app_id, domain=self.domain.id)
             app.app_name = inc.app_name
             app.save()
                 
@@ -235,9 +234,9 @@ class FormDefLoader(Loader):
                     application = Application.get_by_app_id_str(app_id, domain)
                     try:
                         if not application:
-                            fd = FormDefinition.get(FormDefinition.xmlns==xmlns, FormDefinition.application>>None, FormDefinition.domain==domain)
+                            fd = FormDefinition.get(FormDefinition.xmlns == xmlns, FormDefinition.application >> None, FormDefinition.domain == domain)
                         else:
-                            fd = FormDefinition.get(FormDefinition.xmlns==xmlns, FormDefinition.application==application, FormDefinition.domain==domain)
+                            fd = FormDefinition.get(FormDefinition.xmlns == xmlns, FormDefinition.application == application, FormDefinition.domain == domain)
                     except FormDefinition.DoesNotExist:
                         fd = FormDefinition(xmlns=xmlns, application=application, domain=domain)
                     
@@ -276,9 +275,9 @@ class FormDefLoader(Loader):
 
             try:
                 if not (inc.app_id):
-                    fd = FormDefinition.get(FormDefinition.xmlns==inc.form_xmlns, FormDefinition.application>>None, FormDefinition.domain==domain)
+                    fd = FormDefinition.get(FormDefinition.xmlns == inc.form_xmlns, FormDefinition.application >> None, FormDefinition.domain == domain)
                 else:
-                    fd = FormDefinition.get(FormDefinition.xmlns==inc.form_xmlns, FormDefinition.application==application, FormDefinition.domain==domain)
+                    fd = FormDefinition.get(FormDefinition.xmlns == inc.form_xmlns, FormDefinition.application == application, FormDefinition.domain == domain)
             except FormDefinition.DoesNotExist:
                 fd = FormDefinition(xmlns=inc.form_xmlns, application=application, domain=domain)
                 
@@ -346,7 +345,7 @@ class WebUserLoader(Loader):
                     du.save()
                     
                 except Domain.DoesNotExist:
-                    logger.error('No domain found with name %s' % inc.domain )
+                    logger.error('No domain found with name %s' % inc.domain)
             
     def do_load(self):
         logger.info('TIMESTAMP starting web user table load %s' % datetime.datetime.now())
@@ -371,13 +370,13 @@ class UserLoader(Loader):
         super(UserLoader, self).__init__()
         
     def fetch_incoming_from_api(self, user_id):
-        url = 'https://www.commcarehq.org/a/%s/api/%s/user/%s' % (self.domain.name,self.api_version,user_id)
+        url = 'https://www.commcarehq.org/a/%s/api/%s/user/%s' % (self.domain.name, self.api_version, user_id)
         try:
             req = requests.get(url, auth=HTTPDigestAuth(self.username, self.password))
             if req.status_code == 200:
                 user_dict = req.json()
                 user_dict['user_id'] = user_dict['id'] 
-                user_dict.pop('id', None) # don't keep the ID in or it will try to set the autogenerated db id
+                user_dict.pop('id', None)  # don't keep the ID in or it will try to set the autogenerated db id
                 user_dict['phone_numbers'] = ','.join(user_dict['phone_numbers'])
                 user_dict['groups'] = ','.join(user_dict['groups'])
                 user_dict['domain'] = self.domain.name
@@ -389,7 +388,7 @@ class UserLoader(Loader):
             elif req.status_code == 400:
                 logger.warn('API returned not found for user_id %s' % user_id)
             else:
-                logger.warn('Got status code %s trying to retrieve user data by user_id, url was %s' % (req.status_code,url))
+                logger.warn('Got status code %s trying to retrieve user data by user_id, url was %s' % (req.status_code, url))
         except RequestException, e:
             logger.warn('Error trying to retrieve user data by user_id')
             logger.exception(e)
@@ -397,7 +396,7 @@ class UserLoader(Loader):
     def create_missing(self, user_id):
         new_incoming_user = self.fetch_incoming_from_api(user_id)
         if new_incoming_user:
-            new_incoming_user.deleted = True # must be deleted, because this user was missing from the user API call results
+            new_incoming_user.deleted = True  # must be deleted, because this user was missing from the user API call results
             new_incoming_user.save()
             
             new_user_id = self.create_or_update_user(new_incoming_user)
@@ -413,7 +412,7 @@ class UserLoader(Loader):
                 u = User.create(user_id=user_id)
             return u.id
         
-    def create_or_update_user(self,incoming_user): 
+    def create_or_update_user(self, incoming_user): 
         try:
             u = User.get(user_id=incoming_user.user_id)
         except User.DoesNotExist:
@@ -466,7 +465,7 @@ class UserLoader(Loader):
             for user_id in missing_user_ids:
                 new_incoming_user = self.fetch_incoming_from_api(user_id)
                 if new_incoming_user:
-                    new_incoming_user.deleted = True # must be deleted, because not in this list of API call results
+                    new_incoming_user.deleted = True  # must be deleted, because not in this list of API call results
                     new_incoming_user.save()
                     logger.info('Updating user %s deleted to True' % user_id)
                     self.create_or_update_user(new_incoming_user)
@@ -502,7 +501,7 @@ class CasesLoader(Loader):
         
         cases_cur = Cases._meta.database.execute_sql('select case_id, date_modified from cases '
                                                 'where cases.domain_id = %d' % self.domain.id)
-        case_updates_dict = dict([(c[0],c[1]) for c in cases_cur.fetchall()])
+        case_updates_dict = dict([(c[0], c[1]) for c in cases_cur.fetchall()])
         existing_case_ids = case_updates_dict.keys()
         
         insert_dicts = []
@@ -617,8 +616,8 @@ class CaseEventLoader(Loader):
         
     def do_load(self):
         logger.info('TIMESTAMP starting case event table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
-        ce_q = IncomingForm.select(IncomingForm.form, 
-                                   IncomingForm.case, IncomingForm.alt_case, 
+        ce_q = IncomingForm.select(IncomingForm.form,
+                                   IncomingForm.case, IncomingForm.alt_case,
                                    IncomingForm.closed, IncomingForm.created, IncomingForm.updated).where((IncomingForm.domain == self.domain.name) 
                                                                                                       & ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
         
@@ -693,7 +692,7 @@ class VisitLoader(Loader):
         
         time_start = min(visited_forms, key=lambda x : x.time_start).time_start
         time_end = max(visited_forms, key=lambda x : x.time_end).time_end
-        v = Visit.create(user=user, time_start=time_start, time_end=time_end, domain = self.domain)
+        v = Visit.create(user=user, time_start=time_start, time_end=time_end, domain=self.domain)
         
         ids = [f.id for f in visited_forms]
         uq = Form.update(visit=v).where(Form.id << ids)
@@ -756,7 +755,7 @@ class VisitLoader(Loader):
                     form_case_parents = [caseevent_parent_dict[cec.id] for cec in case_events if cec.id in caseevent_parent_dict]
                     
                     # if there is longer than 12 hours between the end time of the previous form and the start time of this one, don't add to visit
-                    if (prev_visited_forms and (prev_visited_forms[len(prev_visited_forms)-1].time_end < (frm.time_start - timedelta(hours=12)))):
+                    if (prev_visited_forms and (prev_visited_forms[len(prev_visited_forms) - 1].time_end < (frm.time_start - timedelta(hours=12)))):
                         add_to_previous = False
                     
                     # if all cases in this form are the same as all cases previously visited, add this form to the visit
@@ -884,20 +883,20 @@ class SalesforceObjectLoader(Loader):
         object_types = all_unimported.select(IncomingSalesforceRecord.object_type).distinct()
         
         for obj in object_types:
-            unimported_recs = all_unimported.select().where(IncomingSalesforceRecord.object_type==obj.object_type)
+            unimported_recs = all_unimported.select().where(IncomingSalesforceRecord.object_type == obj.object_type)
             unimported_dicts = [json.loads(rec.record) for rec in unimported_recs]
             for d in unimported_dicts:
                 d['url'] = d['attributes']['url']
                 del d['attributes']
                 
-                for k,v in d.iteritems():
+                for k, v in d.iteritems():
                     if isinstance(v, dict):
                         d[k] = json.dumps(v)
                         
             df = DataFrame(unimported_dicts)
             df.columns = [colname.lower() for colname in df.columns]
             table_name = 'sf_%s' % (obj.object_type.lower())
-            logger.info('Writing records for Salesforce object %s to db table %s' % (obj.object_type,table_name))
+            logger.info('Writing records for Salesforce object %s to db table %s' % (obj.object_type, table_name))
             df.to_sql(table_name, self.engine, flavor='postgresql', if_exists='replace', index=False, index_label=None)
             
             

@@ -1,0 +1,1 @@
+﻿alter table incoming_form add column record_type varchar(255);

@@ -8,6 +8,7 @@ import json
 import logging
 import os
 
+from commcare_export.commcare_hq_client import MockCommCareHqClient
 from commcare_export.commcare_minilinq import CommCareHqEnv
 from commcare_export.env import BuiltInEnv, JsonPathEnv
 from commcare_export.minilinq import Emit, Literal, Map, FlatMap, Reference, \
@@ -185,7 +186,7 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
     An extractor for forms using the CommCare Data APIs
     https://confluence.dimagi.com/display/commcarepublic/Data+APIs
     '''
-
+    
     _incoming_table_class = IncomingForm
     
     def __init__(self, domain, incremental=True):
@@ -193,9 +194,35 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
         Constructor
         '''
         super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, domain, incremental=incremental)
+        
+    @property
+    def _get_formcase_query(self):
+        # headings need to be lower case and not reserved words for the postgresql copy to work
+        formcase_query = Emit(table=self._get_table_name,
+                    headings=[Literal('ccx_id'),
+                              Literal('form_id'),
+                              Literal('domain'),
+                              Literal('case_id'),
+                              Literal('alt_case_id'),
+                              Literal('created'),
+                              Literal('updated'),
+                              Literal('closed'),
+                              Literal('record_type')],
+                    source=Map(source=FlatMap(body=Reference('form..case'),
+                                              source=Apply(Reference('api_data'), Literal('form'))),
+                               body=List([Reference('id'),
+                              Reference('$.metadata.instanceID'),
+                              Reference('$.domain'),
+                              Reference('@case_id'),
+                              Reference('case_id'),
+                              Apply(Reference('bool'), Reference('create')),
+                              Apply(Reference('bool'), Reference('update')),
+                              Apply(Reference('bool'), Reference('close')),
+                              Literal('case_event'),])))
+        return formcase_query
     
     @property
-    def _get_query(self):
+    def _get_form_query(self):
         # headings need to be lower case and not reserved words for the postgresql copy to work
         form_query = Emit(table=self._get_table_name,
                     headings=[Literal('ccx_id'),
@@ -210,13 +237,8 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
                               Literal('time_start'),
                               Literal('time_end'),
                               Literal('received_on'),
-                              Literal('case_id'),
-                              Literal('alt_case_id'),
-                              Literal('created'),
-                              Literal('updated'),
-                              Literal('closed')],
-                    source=Map(source=FlatMap(body=Reference('form..case'),
-                                              source=Apply(Reference('api_data'), Literal('form'))),
+                              Literal('record_type'),],
+                    source=Map(source=Apply(Reference('api_data'), Literal('form')),
                                body=List([Reference('id'),
                               Reference('$.metadata.instanceID'),
                               Reference('$.form.@xmlns'),
@@ -229,12 +251,46 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
                               Reference('$.metadata.timeStart'),
                               Reference('$.metadata.timeEnd'),
                               Reference('$.received_on'),
-                              Reference('@case_id'),
-                              Reference('case_id'),
-                              Apply(Reference('bool'), Reference('create')),
-                              Apply(Reference('bool'), Reference('update')),
-                              Apply(Reference('bool'), Reference('close')), ])))
+                              Literal('form'),])))
         return form_query
+    
+    def extract_chunk(self, since, until):
+        api_call_start = datetime.datetime.now() # when did the API call start? if until is none, we can assume we fetched records up to this time
+        try:
+            logger.info("%s doing chunked extract for domain %s, requesting records since %s until %s" 
+                        % (self.__class__.__name__, self.domain, since if since else 'forever', until if until else 'forever'))
+       
+            
+            params = {'limit': 1000}
+            if since:
+                params.update({'received_on_start':since.strftime("%Y-%m-%dT%H:%M:%S")})
+            
+            forms = self.api_client.iterate('form', params)
+            form_data = [form for form in forms]
+            mock_hq_client_data =  {'form':[(params,form_data)]}
+            client = MockCommCareHqClient(mock_hq_client_data)
+            
+            writer = PgCopyWriter(self.engine.connect(), self.api_client.project)
+            
+            for query in [self._get_form_query, self._get_formcase_query]:
+                env = BuiltInEnv() | CommCareHqEnv(client) | JsonPathEnv({})
+                result = query.eval(env)
+                
+                if (self._get_table_name in [t['name'] for t in env.emitted_tables()]):
+                    with writer:
+                        for table in env.emitted_tables():
+                            writer.write_table(table, self._get_attribute_db_cols, self._get_hstore_db_col)
+                else:
+                    logger.warn('no table emitted with name %s' % self._get_table_name)
+            
+            self.extract_log.extract_end = until if until else api_call_start
+        
+        except:
+            raise
+  
+        finally:
+            if self.extract_log.extract_end:
+                self.extract_log.save()
     
 class CommCareExportCaseExtractor(CommCareExportExtractor):
     '''

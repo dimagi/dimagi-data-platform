@@ -584,6 +584,11 @@ class FormLoader(Loader):
                 end = datetime.datetime.strptime(incform.time_end, '%Y-%m-%dT%H:%M:%S') if incform.time_end else None
                 rec = datetime.datetime.strptime(incform.received_on, '%Y-%m-%dT%H:%M:%S') if incform.received_on else None
                 
+                # adjust form end to time received at server if > 30 days between the two
+                if (start & end & rec) and (abs((rec-end).days) > 30):
+                    end = rec
+                    start = rec-(end-start)
+                
                 phone = (incform.is_phone_submission == "1.0")
                 
                 application = Application.get_by_app_id_str(incform.app, self.domain)

@@ -268,20 +268,20 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
             forms = self.api_client.iterate('form', params)
             form_data = [form for form in forms]
             mock_hq_client_data =  {'form':[(params,form_data)]}
-
             client = MockCommCareHqClient(mock_hq_client_data)
-            env = BuiltInEnv() | CommCareHqEnv(client) | JsonPathEnv({})
-            for query in [self._get_form_query, self._get_formcase_query]:  
-                result = query.eval(env)
-                
+            
             writer = PgCopyWriter(self.engine.connect(), self.api_client.project)
             
-            if (self._get_table_name in [t['name'] for t in env.emitted_tables()]):
-                with writer:
-                    for table in env.emitted_tables():
-                        writer.write_table(table, self._get_attribute_db_cols, self._get_hstore_db_col)
-            else:
-                logger.warn('no table emitted with name %s' % self._get_table_name)
+            for query in [self._get_form_query, self._get_formcase_query]:
+                env = BuiltInEnv() | CommCareHqEnv(client) | JsonPathEnv({})
+                result = query.eval(env)
+                
+                if (self._get_table_name in [t['name'] for t in env.emitted_tables()]):
+                    with writer:
+                        for table in env.emitted_tables():
+                            writer.write_table(table, self._get_attribute_db_cols, self._get_hstore_db_col)
+                else:
+                    logger.warn('no table emitted with name %s' % self._get_table_name)
             
             self.extract_log.extract_end = until if until else api_call_start
         

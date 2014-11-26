@@ -585,7 +585,7 @@ class FormLoader(Loader):
                 rec = datetime.datetime.strptime(incform.received_on, '%Y-%m-%dT%H:%M:%S') if incform.received_on else None
                 
                 # adjust form end to time received at server if > 30 days between the two
-                if (start & end & rec) and (abs((rec-end).days) > 30):
+                if (not (None in (start,end,rec))) and (abs((rec-end).days) > 30):
                     end = rec
                     start = rec-(end-start)
                 

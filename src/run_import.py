@@ -35,6 +35,8 @@ db = conf.PEEWEE_DB_CON
         
 def setup():
     logger.setLevel(logging.DEBUG)
+    
+    # console logger
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -43,12 +45,22 @@ def setup():
     
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
+    
+    # debug logger
     file_handler = logging.handlers.RotatingFileHandler(os.path.join(conf.LOG_FILES_DIR,'data_platform_run.log'),
                                                maxBytes=500000000,
                                                backupCount=5,)
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
     root.addHandler(file_handler)
+    
+    # warning and error logger
+    warning_handler = logging.handlers.RotatingFileHandler(os.path.join(conf.LOG_FILES_DIR,'data_platform_warning.log'),
+                                               maxBytes=5000000,
+                                               backupCount=5,)
+    warning_handler.setLevel(logging.WARNING)
+    warning_handler.setFormatter(formatter)
+    root.addHandler(warning_handler)
 
     incoming_data_tables.create_missing_tables()
     data_warehouse_db.create_missing_tables()

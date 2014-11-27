@@ -223,9 +223,8 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
                               Apply(Reference('bool'), Reference('close')),
                               Literal('case_event'),]
         
-        domain_attrs = self.domain_object.attributes
-        if 'impact_case_properties' in domain_attrs:
-            properties_list = [pr.strip() for pr in domain_attrs['impact_case_properties'].split(',')]
+        if 'impact_case_properties' in self.domain_object.attributes:
+            properties_list = [pr.strip() for pr in self.domain_object.attributes['impact_case_properties'].split(',')]
             heading_list.extend([Literal(prop) for prop in properties_list if prop])
             source_field_list.extend([Reference('update.%s' % prop) for prop in properties_list if prop]) 
         
@@ -273,11 +272,12 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
         api_call_start = datetime.datetime.now() # when did the API call start? if until is none, we can assume we fetched records up to this time
         try:
             logger.info("%s doing chunked extract for domain %s, requesting records since %s until %s" 
-                        % (self.__class__.__name__, self.domain, since if since else 'forever', until if until else 'forever'))
+                        % (self.__class__.__name__, self.domain, since if (since 
+                           and not 'impact_case_properties' in self.domain_object.attributes) 
+                           else 'forever', until if until else 'forever'))
        
-            
             params = {'limit': 1000}
-            if since:
+            if since and not 'impact_case_properties' in self.domain_object.attributes: # if we have impact case properties pull everything
                 params.update({'received_on_start':since.strftime("%Y-%m-%dT%H:%M:%S")})
             
             forms = self.api_client.iterate('form', params)

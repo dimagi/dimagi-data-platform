@@ -274,6 +274,8 @@ class CaseEvent(BaseModel):
     updated = BooleanField(null=True)
     case = ForeignKeyField(db_column='case_id', null=True, rel_model=Cases, related_name='caseevents', on_delete='CASCADE')
     form = ForeignKeyField(db_column='form_id', null=True, rel_model=Form, related_name='caseevents', on_delete='CASCADE')
+    
+    case_properties = HStoreField(null=True)
 
     class Meta:
         db_table = 'case_event'

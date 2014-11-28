@@ -624,13 +624,15 @@ class CaseEventLoader(Loader):
         
     def do_load(self):
         logger.info('TIMESTAMP starting case event table load for domain %s %s' % (self.domain.name, datetime.datetime.now()))
-        ce_q = IncomingForm.select(IncomingForm.form,
+        ce_q = IncomingForm.select(IncomingForm.id, IncomingForm.form,
                                    IncomingForm.case, IncomingForm.alt_case,
                                    IncomingForm.closed, IncomingForm.created,
-                                   IncomingForm.updated).where(
+                                   IncomingForm.updated, IncomingForm.case_properties).distinct(([IncomingForm.form],
+                                                                                                 [IncomingForm.case],
+                                                                                                 [IncomingForm.alt_case])).where(
                                         (IncomingForm.domain == self.domain.name) 
                                         & (IncomingForm.record_type == 'case_event')
-                                        & ((IncomingForm.imported == False) | (IncomingForm.imported >> None)))
+                                        & ((IncomingForm.imported == False) | (IncomingForm.imported >> None))).order_by(IncomingForm.id.desc())
                                    
         cur = CaseEvent._meta.database.execute_sql('select form.form_id, cases.case_id '
                                                 'from form, cases, case_event '
@@ -650,24 +652,28 @@ class CaseEventLoader(Loader):
         
         insert_dicts = []
         for ce in ce_q.iterator():
+            ce.case = ce.case if ce.case else ce.alt_case
+            created = (ce.created == "True")
+            updated = (ce.updated == "True")
+            closed = (ce.closed == "True")
             
-            if (ce.form and (ce.case or ce.alt_case)) and ((ce.form, ce.case if ce.case else ce.alt_case) not in existing_pairs):
-                ce.case = ce.case if ce.case else ce.alt_case
-                if ce.form in forms_dict and ce.case in cases_dict: 
-                    created = (ce.created == "True")
-                    updated = (ce.updated == "True")
-                    closed = (ce.closed == "True")
-                    row = {'form':forms_dict[ce.form], 'case':cases_dict[ce.case], 'closed': closed, 'created': created, 'updated':updated}
-                    insert_dicts.append(row)
-                else :
-                    logger.error("while inserting case event, could not find either form %s or case %s in domain %s" 
+            if ce.form in forms_dict and ce.case in cases_dict: 
+                row = {'form':forms_dict[ce.form], 'case':cases_dict[ce.case], 
+                       'closed': closed, 'created': created, 'updated':updated,
+                       'case_properties': ce.case_properties}
+            else:
+                logger.error("while inserting case event, could not find either form %s or case %s in domain %s" 
                                  % (ce.form, ce.case if ce.case else ce.alt_case, self.domain.name))
-        
-        
+                    
+            if (ce.form and (ce.case or ce.alt_case)) and ((ce.form, ce.case if ce.case else ce.alt_case) not in existing_pairs):
+                insert_dicts.append(row)
+            elif ce.case_properties:
+                q = CaseEvent.update(**row).where((CaseEvent.case == row['case']) & (CaseEvent.form == row['form']))
+                q.execute()
+                
         if insert_dicts:
-            deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
-            logger.info("inserting %d case events for domain %s" % (len(deduped), self.domain.name))
-            self.insert_chunked(deduped)
+            logger.info("inserting %d case events for domain %s" % (len(insert_dicts), self.domain.name))
+            self.insert_chunked(insert_dicts)
 
 class VisitLoader(Loader):
     '''

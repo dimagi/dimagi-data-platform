@@ -193,13 +193,18 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
         '''
         Constructor
         '''
+        try:
+            self.domain_object = Domain.get(name = domain)
+        except Domain.DoesNotExist:
+            logger.error('No domain named %s, cannot start CommCareExportFormExtractor' % domain)
+            return
+        
         super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, domain, incremental=incremental)
         
     @property
     def _get_formcase_query(self):
         # headings need to be lower case and not reserved words for the postgresql copy to work
-        formcase_query = Emit(table=self._get_table_name,
-                    headings=[Literal('ccx_id'),
+        heading_list = [Literal('ccx_id'),
                               Literal('form_id'),
                               Literal('domain'),
                               Literal('case_id'),
@@ -207,10 +212,8 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
                               Literal('created'),
                               Literal('updated'),
                               Literal('closed'),
-                              Literal('record_type')],
-                    source=Map(source=FlatMap(body=Reference('form..case'),
-                                              source=Apply(Reference('api_data'), Literal('form'))),
-                               body=List([Reference('id'),
+                              Literal('record_type')]
+        source_field_list = [Reference('id'),
                               Reference('$.metadata.instanceID'),
                               Reference('$.domain'),
                               Reference('@case_id'),
@@ -218,7 +221,18 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
                               Apply(Reference('bool'), Reference('create')),
                               Apply(Reference('bool'), Reference('update')),
                               Apply(Reference('bool'), Reference('close')),
-                              Literal('case_event'),])))
+                              Literal('case_event'),]
+        
+        if 'impact_case_properties' in self.domain_object.attributes:
+            properties_list = [pr.strip() for pr in self.domain_object.attributes['impact_case_properties'].split(',')]
+            heading_list.extend([Literal(prop) for prop in properties_list if prop])
+            source_field_list.extend([Reference('update.%s' % prop) for prop in properties_list if prop]) 
+        
+        formcase_query = Emit(table=self._get_table_name,
+                    headings=heading_list,
+                    source=Map(source=FlatMap(body=Reference('form..case'),
+                                              source=Apply(Reference('api_data'), Literal('form'))),
+                               body=List(source_field_list)))
         return formcase_query
     
     @property
@@ -258,16 +272,18 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
         api_call_start = datetime.datetime.now() # when did the API call start? if until is none, we can assume we fetched records up to this time
         try:
             logger.info("%s doing chunked extract for domain %s, requesting records since %s until %s" 
-                        % (self.__class__.__name__, self.domain, since if since else 'forever', until if until else 'forever'))
+                        % (self.__class__.__name__, self.domain, since if (since 
+                           and not 'impact_case_properties' in self.domain_object.attributes) 
+                           else 'forever', until if until else 'forever'))
        
-            
             params = {'limit': 1000}
-            if since:
+            if since and not 'impact_case_properties' in self.domain_object.attributes: # if we have impact case properties pull everything
                 params.update({'received_on_start':since.strftime("%Y-%m-%dT%H:%M:%S")})
             
             forms = self.api_client.iterate('form', params)
             form_data = [form for form in forms]
-            mock_hq_client_data =  {'form':[(params,form_data)]}
+            mock_hq_client_data =  {'form':[({'limit': 1000},form_data)]} # doesn't work with the received_on param, don't know why
+
             client = MockCommCareHqClient(mock_hq_client_data)
             
             writer = PgCopyWriter(self.engine.connect(), self.api_client.project)

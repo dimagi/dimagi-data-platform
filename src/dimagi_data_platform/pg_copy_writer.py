@@ -70,7 +70,7 @@ class CsvPlainWriter(TableWriter):
                         out.append(v.encode('utf-8') if isinstance(v, six.text_type) else v)
                     else:
                         hstore_dict[k] = v
-                hstore_str = ','.join("%s=>%s" % (key, val) for (key, val) in hstore_dict.iteritems())      
+                hstore_str = ','.join("%s=>%s" % (key, val.replace(',','\,')) for (key, val) in hstore_dict.iteritems() if val is not None and not (val == ''))      
                 
                 if hstore_col_name:
                     out.append(hstore_str)

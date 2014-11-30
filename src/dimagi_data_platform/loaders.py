@@ -661,15 +661,14 @@ class CaseEventLoader(Loader):
                 row = {'form':forms_dict[ce.form], 'case':cases_dict[ce.case], 
                        'closed': closed, 'created': created, 'updated':updated,
                        'case_properties': ce.case_properties}
+                if (ce.form and ce.case) and ((ce.form, ce.case) not in existing_pairs):
+                    insert_dicts.append(row)
+                elif ce.case_properties:
+                    q = CaseEvent.update(**row).where((CaseEvent.case == row['case']) & (CaseEvent.form == row['form']))
+                    q.execute()
             else:
-                logger.error("while inserting case event, could not find either form %s or case %s in domain %s" 
+                logger.warning("while inserting case event, could not find either form %s or case %s in domain %s" 
                                  % (ce.form, ce.case if ce.case else ce.alt_case, self.domain.name))
-                    
-            if (ce.form and (ce.case or ce.alt_case)) and ((ce.form, ce.case if ce.case else ce.alt_case) not in existing_pairs):
-                insert_dicts.append(row)
-            elif ce.case_properties:
-                q = CaseEvent.update(**row).where((CaseEvent.case == row['case']) & (CaseEvent.form == row['form']))
-                q.execute()
                 
         if insert_dicts:
             logger.info("inserting %d case events for domain %s" % (len(insert_dicts), self.domain.name))

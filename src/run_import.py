@@ -74,12 +74,10 @@ def update_hq_admin_data(username, password):
     domain_annotation_extractor = ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx")
     form_annotation_extractor = ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx")
     extractors = [domain_extractor,webuser_extractor, domain_annotation_extractor,form_annotation_extractor]
-
     for extractor in extractors:
         extractor.do_extract()
     
     domain_loader = DomainLoader()
-    load_and_cleanup(domain_loader, domain_annotation_extractor)
     load_and_cleanup(domain_loader,domain_extractor, domain_annotation_extractor)
     
     webuser_loader = WebUserLoader()

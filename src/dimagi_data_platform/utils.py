@@ -25,51 +25,10 @@ def get_domains(run_conf_json):
     if domain_conf_json == 'all':
         return [dm.name for dm in Domain.select().where(Domain.active==True)] if active_only else [dm.name for dm in Domain.select()]
     
-    domains = []
-    domain_db_cols = [d.db_column for d in Domain._meta.fields.values()]
-    
+    conf_domains = []
     if 'names' in domain_conf_json:
-        named_domains = [d['name'] for d in domain_conf_json['names']]
-        domains.extend(named_domains)
-        
-    if 'filters' in domain_conf_json:
-        filters = domain_conf_json['filters']
-        filter_lists = []
-        
-        for filter in filters:
-            filter_by = filter['filterby']
-            values = filter['values']
-            values_list = [v.strip() for v in values.split(',')]
-            
-            filter_domains = []
-            
-            if (filter_by in domain_db_cols):
-                db_col_filter = Domain.raw('select name from domain where %s in (%s)' % (filter_by, ','.join(["'%s'"%v for v in values_list])))
-                filter_domains = [d.name for d in db_col_filter]
-            
-            elif filter_by == 'subsector':
-                all_domains = Domain.select()
-                for domain in all_domains:
-                    sub_names = [ds.subsector.name for ds in domain.domainsubsectors]
-                    if len(set(sub_names) & set(values_list)) > 0:
-                        filter_domains.append(domain.name)
-            
-            elif filter_by == 'sector':
-                all_domains = Domain.select()
-                for domain in all_domains:
-                    sec_names = [ds.sector.name for ds in domain.domainsectors]
-                    if len(set(sec_names) & set(values_list)) > 0:
-                        filter_domains.append(domain.name)
-            else:
-                for val in values_list:
-                    val_domains = Domain.select().where(Domain.attributes.contains({filter_by: val}))
-                    filter_domains.extend([v.name for v in val_domains])
-            
-            filter_lists.append(filter_domains)
-        if filter_lists:
-            domains.extend(set(filter_lists[0]).intersection(*filter_lists))
-    
-    conf_domains = list(set(domains))
+        named_domains = domain_conf_json['names']
+        conf_domains.extend(named_domains)
     
     if active_only:
         active_domains = Domain.select().where((Domain.name << conf_domains) & (Domain.active == True))

@@ -169,7 +169,7 @@ class User(BaseModel):
     first_name = CharField(db_column='first_name', max_length=255, null=True)
     last_name = CharField(db_column='last_name', max_length=255, null=True)
     default_phone_number = CharField(db_column='default_phone_number', max_length=255, null=True)
-    email = CharField(db_column='email', max_length=255, null=True)
+    email = CharField(db_column='email"test-automation","test-bola-project","testproject1567","saans-medical","test-vanessa-project', max_length=255, null=True)
     phone_numbers= ArrayField(CharField,null=True)
     
     class Meta:
@@ -222,6 +222,7 @@ class Visit(BaseModel):
     time_start = DateTimeField(null=True)
 
     user = ForeignKeyField(db_column='user_id', null=True, rel_model=User, related_name='visits', on_delete='CASCADE')
+    domain = ForeignKeyField(db_column='domain_id', null=True, rel_model=Domain, related_name='visits')
     class Meta:
         db_table = 'visit'
 models.append(Visit)

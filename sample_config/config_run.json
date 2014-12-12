@@ -1,20 +1,9 @@
 {
     "data_platform": 
-    {
+    {	"active_domains_only" : false,
         "domains": 
-        {
-            "names": 
-            [
-                {
-                    "name": "melissa-test-project"
-                },
-                {
-                    "name": "another-project"
-                },
-                {
-                    "name": "something-else"
-                }
-            ]
+        {	
+            "names": ["melissa-test-project"]
         }
     }
 }

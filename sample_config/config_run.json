@@ -1,6 +1,8 @@
 {
     "data_platform": 
-    {	"active_domains_only" : false,
+    {	
+    	"incremental" : true,
+    	"active_domains_only" : false,
         "domains": 
         {	
             "names": ["melissa-test-project"]

@@ -181,9 +181,12 @@ def main():
         update_hq_admin_data(username, password)
         domain_list = get_domains(conf.RUN_CONF_JSON)
         
+        # default to incremental update
+        incremental = conf.RUN_CONF_JSON['incremental'] if 'incremental' in conf.RUN_CONF_JSON else True
+        
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
-        update_for_domains(domain_list, username, password, incremental = True)
+        update_for_domains(domain_list, username, password, incremental = incremental)
         
         update_from_salesforce()
     

@@ -1,0 +1,8 @@
+git+https://github.com/dimagi/commcare-export
+psycopg2
+numpy
+peewee
+pandas==0.13.1
+simple_salesforce
+slumber
+xlrd

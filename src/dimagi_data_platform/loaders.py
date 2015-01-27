@@ -220,7 +220,7 @@ class FormDefLoader(Loader):
         super(FormDefLoader, self).__init__()
         
     def load_from_annotations(self):
-        for row in IncomingFormAnnotation.get_unimported().select().where(IncomingDomainAnnotation.attributes.contains({'Domain name': self.domain.name})):
+        for row in IncomingFormAnnotation.get_unimported().select().where(IncomingFormAnnotation.attributes.contains({'Domain name': self.domain.name})):
             attrs = row.attributes
             
             if not ('Form xmlns' in attrs and 'Domain name' in attrs):

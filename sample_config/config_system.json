@@ -13,7 +13,8 @@
         "directories": 
         {
             "input": "/path/to/input",
-            "tmp_files": "/path/to/input"
+            "tmp_files": "/path/to/input",
+            "log_files": "/path/to/input"
         },
 
         "s3": 

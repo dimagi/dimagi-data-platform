@@ -15,7 +15,6 @@ from requests.auth import HTTPDigestAuth
 from requests.exceptions import RequestException
 import slumber
 import sqlalchemy
-from sqlalchemy import distinct
 
 from dimagi_data_platform import conf, data_warehouse_db
 from dimagi_data_platform.data_warehouse_db import Domain, Sector, DomainSector, \
@@ -418,7 +417,7 @@ class UserLoader(Loader):
         
     def create_or_update_user(self, incoming_user): 
         try:
-            u = User.get(User.user_id==incoming_user.user_id)
+            u = User.get(user_id=incoming_user.user_id)
         except User.DoesNotExist:
             logger.info('creating new user for user_id %s' % incoming_user.user_id)
             u = User.create(user_id=incoming_user.user_id)
@@ -814,60 +813,7 @@ class VisitLoader(Loader):
             # save the last visit for this user
             if prev_visited_forms:
                 previous_visit = self.create_visit(usr, prev_visited_forms)
-
-
-def get_date_from_devicelog(log):
-    try:
-        log_date = datetime.datetime.strptime(log.log_date, '%Y-%m-%dT%H:%M:%S') if log.log_date else None
-    except ValueError, v:  # this is for log entries with decimal seconds
-        # see http://stackoverflow.com/questions/5045210/how-to-remove-unconverted-data-from-a-python-datetime-object
-        if len(v.args) > 0 and v.args[0].startswith('unconverted data remains: '):
-            stripped_date = log.log_date[:-(len(v.args[0]) - 26)]
-            log_date = datetime.datetime.strptime(stripped_date, '%Y-%m-%dT%H:%M:%S')
-        else:
-            raise v
-    return log_date
-
-def user_dicts():
-    user_q = User.select()
-    user_id_dict = dict([(u.user_id, u.id) for u in user_q])
-    user_username_dict = dict([((u.username.split('@')[0]), u.id) for u in user_q if (u.username and '@' in u.username)])
-    return user_id_dict, user_username_dict
-
-def get_and_create_user_id(user_id_dict, user_username_dict, user_loader, user_id=None, username=None, domain=None):
-    if user_id in user_id_dict:
-        ret_id = user_id_dict[user_id]
-    elif username and username in user_username_dict:
-        ret_id = user_username_dict[inc.username]
-    else:
-        logger.warn("while inserting device log for domain %s "
-        "couldn't find user with user ID %s or username %s" % (domain, user_id, username))
-        ret_id = user_loader.create_missing(user_id)
-        user_id_dict[user_id] = ret_id
-    return ret_id, user_id_dict
-
-def set_devicelog_users(xform_id, user_loader):
-    user_id_dict, user_username_dict = user_dicts()
-    logs = DeviceLog.select().where(DeviceLog.form == xform_id) \
-                             .order_by(DeviceLog.i)
-    logged_in_username = None
-    logged_in_user_id = None 
-    for log in logs.iterator():
-        if log.log_type == 'login':
-            logged_in_username = log.msg.split('-')[1]
-            logged_in_user_id = user_username_dict.get(logged_in_username)
-        elif log.log_type == 'user' and log.msg[:5] == 'login':
-            msg_split = log.msg.split('|')
-            logged_in_username = msg_split[1]
-            user_id = msg_split[2]
-            logged_in_user_id, user_id_dict = get_and_create_user_id(user_id_dict, user_username_dict, user_loader,
-                                                                     user_id=user_id, username=logged_in_username)
-
-        if logged_in_user_id and (not log.user or log.user.id != logged_in_user_id):
-            logger.info("updating incoming_log: %s with id: %s" % (log.id, logged_in_user_id))
-            log.user = logged_in_user_id
-            log.save()
-
+                
 class DeviceLogLoader(Loader):
     '''
     loads data to the user table from the web-user API (incoming web users)
@@ -884,7 +830,11 @@ class DeviceLogLoader(Loader):
         super(DeviceLogLoader, self).__init__()
     
     def load_from_API(self):
-        user_id_dict, user_username_dict = user_dicts()       
+        user_q = User.select()
+        user_id_dict = dict([(u.user_id, u.id) for u in user_q])
+    
+        user_username_dict = dict([((u.username.split('@')[0]), u.id) for u in user_q if (u.username and '@' in u.username)])
+        
         existing_cur = DeviceLog._meta.database.execute_sql('select api_id from device_log '
                                                             'where device_log.domain_id = %d' % self.domain.id)
         existing_log_ids = [d[0] for d in existing_cur.fetchall()]
@@ -894,13 +844,28 @@ class DeviceLogLoader(Loader):
         unimported_logs = IncomingDeviceLog.get_unimported(self.domain.name)
         logger.info('Incoming device log table has %d records not imported' % unimported_logs.count())
         
-        xform_ids = set([])
         for inc in unimported_logs.iterator():
             if inc.api_id not in existing_log_ids:
-                log_date = get_date_from_devicelog(inc)
+                try:
+                    log_date = datetime.datetime.strptime(inc.log_date, '%Y-%m-%dT%H:%M:%S') if inc.log_date else None
+                except ValueError, v:  # this is for log entries with decimal seconds 
+                    # see http://stackoverflow.com/questions/5045210/how-to-remove-unconverted-data-from-a-python-datetime-object
+                    if len(v.args) > 0 and v.args[0].startswith('unconverted data remains: '):
+                        stripped_date = inc.log_date[:-(len(v.args[0]) - 26)]
+                        log_date = datetime.datetime.strptime(stripped_date, '%Y-%m-%dT%H:%M:%S')
+                    else:
+                        raise v
+                
                 if (inc.user_id):
-                    user_id, user_id_dict = get_and_create_user_id(user_id_dict, user_username_dict, self.user_loader,
-                                                                   user_id=inc.user_id, username=inc.username, domain=inc.domain)
+                    if inc.user_id in user_id_dict:
+                        user_id = user_id_dict[inc.user_id]
+                    elif inc.username and inc.username in user_username_dict:
+                        user_id = user_username_dict[inc.username]
+                    else:
+                        logger.warn("while inserting device log for domain %s "
+                        "couldn't find user with user ID %s or username %s" % (inc.domain, inc.user_id, inc.username))
+                        new_id = self.user_loader.create_missing(inc.user_id)
+                        user_id_dict[inc.user_id] = new_id
                 else:
                     user_id = None
                         
@@ -908,15 +873,12 @@ class DeviceLogLoader(Loader):
                        'log_date':log_date, 'device_id':inc.device_id, 'form':inc.xform_id,
                        'i':inc.i, 'msg':inc.msg, 'resource_uri':inc.resource_uri, 'log_type':inc.log_type, 'user':user_id}
                 insert_dicts.append(row)
-                xform_ids.add(inc.xform_id)
     
         if insert_dicts:
             deduped = [dict(t) for t in set([tuple(d.items()) for d in insert_dicts])]
             logger.info("inserting %d device log entries for domain %s" % (len(deduped), self.domain.name))
             self.insert_chunked(deduped)
-
-        for xf_id in xform_ids:
-            set_devicelog_users(xf_id, self.user_loader)
+                
 
             
     def do_load(self):

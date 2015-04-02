@@ -568,9 +568,9 @@ class CommCareSlumberFormDefExtractor(SlumberExtractor):
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, self._incoming_table_class._meta.db_table))
         
         # also update IncomingApplication, this loader loads both formdefs and apps
-        inc_app_update_q = IncomingApplication.update(imported=True).where((self._incoming_table_class.domain == self.domain) 
-                                                                          & ((self._incoming_table_class.imported == False) 
-                                                                             | (self._incoming_table_class.imported >> None)))
+        inc_app_update_q = IncomingApplication.update(imported=True).where((IncomingApplication.domain == self.domain) 
+                                                                          & ((IncomingApplication.imported == False) 
+                                                                             | (IncomingApplication.imported >> None)))
         rows = inc_app_update_q.execute()
         logger.info('set imported = True for %d records in incoming data table %s' % (rows, IncomingApplication._meta.db_table))
 

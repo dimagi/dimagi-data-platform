@@ -12,7 +12,7 @@ import os
 from commcare_export.commcare_hq_client import CommCareHqClient
 
 from dimagi_data_platform import incoming_data_tables, data_warehouse_db, conf
-from dimagi_data_platform.data_warehouse_db import Domain
+from dimagi_data_platform.data_warehouse_db import Domain, HQExtractLog
 from dimagi_data_platform.extractors import ExcelExtractor, \
     CommCareExportCaseExtractor, CommCareExportFormExtractor, \
     CommCareExportUserExtractor, CommCareExportDeviceLogExtractor, \
@@ -146,11 +146,27 @@ def update_for_domain(dname, username, password, incremental):
         logger.info('We have %d device log entries to import' % device_logs_to_import)
         devicelog_loader = DeviceLogLoader(dname, user_loader)
         load_and_cleanup(devicelog_loader,devicelog_extractor)
-            
-def update_for_domains(domainlist, username, password, incremental = True):
+
+def get_missed_extractions(dname, start_time):
+    d = Domain.get(name=dname)
+    extractor_names = ["CommCareExportCaseExtractor", "CommCareExportFormExtractor", "CommCareExportUserExtractor",
+        "CommCareExportWebUserExtractor", "CommCareExportDeviceLogExtractor", "CommCareSlumberFormDefExtractor"]
+    missed_extractions = []
+    for e in extractor_names:
+        try:
+            last_extract_log = HQExtractLog.get_last_extract_log(e, d)
+            if last_extract_log.extract_end < start_time:
+                missed_extractions.append(e)
+        except HQExtractLog.DoesNotExist:
+            missed_extractions.append(e)
+    return missed_extractions
+
+
+def update_for_domains(domainlist, username, password, start_time, incremental = True, allow_rerun=True):
     '''
     update per-domain data for domains in domainlist, using given HQ password and username specified in config_sys.json for API calls.
-    '''   
+    '''
+    missed_extractions= {}
     for dname in domainlist:
         try:
             update_for_domain(dname, username, password, incremental)
@@ -158,6 +174,15 @@ def update_for_domains(domainlist, username, password, incremental = True):
         except Exception, e:
                 logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % dname)
                 logger.exception(e)
+
+        missed_extractions[dname] = get_missed_extractions(dname, start_time)
+
+    missed_extractions = dict((k,v) for k,v in missed_extractions.items() if v)
+    logger.info("Missed Extractions: %s" % missed_extractions)
+    if allow_rerun:
+        failed_domain_list = [dname for dname, missed in missed_extractions.items() if "CommCareExportFormExtractor" in missed]
+        logger.info("Rerunning data pull for the following domains: %s" % failed_domain_list)
+        update_for_domains(failed_domain_list, username, password, start_time, incremental=incremental, allow_rerun=False) 
                 
 def update_from_salesforce():
     sf_extractor = SalesforceExtractor(conf.SALESFORCE_USER,conf.SALESFORCE_PASS,conf.SALESFORCE_TOKEN)
@@ -169,7 +194,8 @@ def update_from_salesforce():
     sf_extractor.do_cleanup()
         
 def main():
-        logger.info('TIMESTAMP starting run %s' % datetime.datetime.now())
+        start_time = datetime.datetime.now()
+        logger.info('TIMESTAMP starting run %s' % start_time)
         setup()
         
         username = conf.CC_USER
@@ -184,7 +210,7 @@ def main():
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
-        update_for_domains(domain_list, username, password, incremental = incremental)
+        update_for_domains(domain_list, username, password, start_time, incremental = incremental)
         
         update_from_salesforce()
     

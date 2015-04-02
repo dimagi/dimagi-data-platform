@@ -109,8 +109,6 @@ def update_for_domain(dname, username, password, incremental):
         if (isinstance(extracter, CommCareExportExtractor)):
             extracter.set_api_client(api_client)
         extracter.extract()
-        
-    d.last_hq_import = datetime.datetime.now()
     
     logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
     # these loaders should run even if there are no new forms, cases or device logs

@@ -195,6 +195,7 @@ def update_from_salesforce():
         
 def main():
         start_time = datetime.datetime.now()
+        start_time = datetime.datetime(2015, 4, 2)
         logger.info('TIMESTAMP starting run %s' % start_time)
         setup()
         
@@ -203,8 +204,19 @@ def main():
         
         logger.info('TIMESTAMP updating hq admin data - domains, forms definitions %s' % datetime.datetime.now())
         update_hq_admin_data(username, password)
-        domain_list = get_domains(conf.RUN_CONF_JSON)
         
+        domains = get_domains(conf.RUN_CONF_JSON)
+        domain_list = []
+        for dname in domains:
+            d = Domain.get(name=dname)
+            try: 
+                last_extract_log = HQExtractLog.get_last_extract_log('CommCareExportFormExtractor', d)
+                if last_extract_log.extract_end < start_time:
+                    domain_list.append(dname)
+            except HQExtractLog.DoesNotExist:
+                domain_list.append(dname)
+
+        print domain_list
         # default to incremental update
         incremental = conf.RUN_CONF_JSON['incremental'] if 'incremental' in conf.RUN_CONF_JSON else True
         

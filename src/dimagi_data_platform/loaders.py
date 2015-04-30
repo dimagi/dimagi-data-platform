@@ -4,6 +4,7 @@ Created on Jun 17, 2014
 @author: mel
 '''
 from datetime import timedelta
+from dateutil import parser
 import datetime
 import json
 import logging
@@ -523,9 +524,9 @@ class CasesLoader(Loader):
                 user_id_dict[inccase.owner] = new_id
                 
             # note different date formats for these
-            opened = datetime.datetime.strptime(inccase.date_opened, '%Y-%m-%dT%H:%M:%S') if inccase.date_opened else None
-            modified = datetime.datetime.strptime(inccase.date_modified, '%Y-%m-%d %H:%M:%S') if inccase.date_modified else None
-            closed = datetime.datetime.strptime(inccase.date_closed, '%Y-%m-%d %H:%M:%S') if inccase.date_closed else None
+            opened = parser.parse(inccase.date_opened) if inccase.date_opened else None
+            modified = parser.parse(inccase.date_modified) if inccase.date_modified else None
+            closed = parser.parse(inccase.date_closed) if inccase.date_closed else None
                 
             is_closed = inccase.closed == 'True'
             
@@ -583,9 +584,9 @@ class FormLoader(Loader):
                     new_id = self.user_loader.create_missing(incform.user)
                     user_id_dict[incform.user] = new_id
                 
-                start = datetime.datetime.strptime(incform.time_start, '%Y-%m-%dT%H:%M:%S') if incform.time_start else None
-                end = datetime.datetime.strptime(incform.time_end, '%Y-%m-%dT%H:%M:%S') if incform.time_end else None
-                rec = datetime.datetime.strptime(incform.received_on, '%Y-%m-%dT%H:%M:%S') if incform.received_on else None
+                start = parser.parse(incform.time_start) if incform.time_start else None
+                end = parser.parse(incform.time_end) if incform.time_end else None
+                rec = parser.parse(incform.received_on) if incform.received_on else None
                 
                 # adjust form end to time received at server if > 30 days between the two
                 if (not (None in (start,end,rec))) and (abs((rec-end).days) > 30):
@@ -849,15 +850,7 @@ class DeviceLogLoader(Loader):
         
         for inc in unimported_logs.iterator():
             if inc.api_id not in existing_log_ids:
-                try:
-                    log_date = datetime.datetime.strptime(inc.log_date, '%Y-%m-%dT%H:%M:%S') if inc.log_date else None
-                except ValueError, v:  # this is for log entries with decimal seconds 
-                    # see http://stackoverflow.com/questions/5045210/how-to-remove-unconverted-data-from-a-python-datetime-object
-                    if len(v.args) > 0 and v.args[0].startswith('unconverted data remains: '):
-                        stripped_date = inc.log_date[:-(len(v.args[0]) - 26)]
-                        log_date = datetime.datetime.strptime(stripped_date, '%Y-%m-%dT%H:%M:%S')
-                    else:
-                        raise v
+                log_date = parser.parse(inc.log_date) if inc.log_date else None
                 
                 if (inc.user_id):
                     if inc.user_id in user_id_dict:

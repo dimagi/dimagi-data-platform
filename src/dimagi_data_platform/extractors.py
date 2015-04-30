@@ -549,7 +549,6 @@ class CommCareSlumberFormDefExtractor(SlumberExtractor):
     def save_incoming(self, app_objects):
         for app in app_objects:
             module_data = app['modules']
-            del app['modules']
             inc_app = IncomingApplication.create(app_id=app["id"], app_name=app["name"],attributes_json=app, domain=self.domain)
             inc_app.save()
             

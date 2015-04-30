@@ -205,7 +205,10 @@ class ApplicationLoader(Loader):
                 app = Application(app_id=inc.app_id, domain=self.domain.id)
             
             app.app_name = inc.app_name
-            app.attributes = dict_flatten(inc.attributes_json)
+            app_json = inc.attributes_json
+            app.app_json = app_json
+            del app_json['modules']
+            app.attributes = dict_flatten(app_json)
             app.attributes = dict_str_vals(app.attributes)
             app.save()
                 

@@ -200,7 +200,8 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
             logger.error('No domain named %s, cannot start CommCareExportFormExtractor' % domain)
             return
         
-        super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, domain, incremental=incremental)
+        super(CommCareExportFormExtractor, self).__init__(self._incoming_table_class, domain, 
+            chunked_by_date=chunked_by_date, incremental=incremental)
         
     @property
     def _get_formcase_query(self):
@@ -321,7 +322,8 @@ class CommCareExportCaseExtractor(CommCareExportExtractor):
         '''
         Constructor
         '''
-        super(CommCareExportCaseExtractor, self).__init__(self._incoming_table_class, domain, incremental=incremental)
+        super(CommCareExportCaseExtractor, self).__init__(self._incoming_table_class, domain, 
+            chunked_by_date=chunked_by_date, incremental=incremental)
     
     @property
     def _get_query(self):

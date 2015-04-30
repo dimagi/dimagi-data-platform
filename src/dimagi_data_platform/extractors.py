@@ -93,7 +93,7 @@ class CommCareExportExtractor(Extractor):
     An extractor that uses commcare-export
     '''
 
-    def __init__(self, incoming_table_class, domain, chunked_by_date = False, incremental = True):
+    def __init__(self, incoming_table_class, domain, chunked_by_date = False, chunked_by_days = 30, incremental = True):
         '''
         Constructor
         '''
@@ -102,6 +102,7 @@ class CommCareExportExtractor(Extractor):
         d = Domain.get(name=self.domain)
         self.extract_log = HQExtractLog(extractor = self.__class__.__name__, domain = d)
         self.chunked_by_date = chunked_by_date
+        self.chunked_by_days = chunked_by_days
 
         if not incremental:
             self.since = None
@@ -160,13 +161,13 @@ class CommCareExportExtractor(Extractor):
         self.extract_log.extract_start = self.since
         
         if self.chunked_by_date:
-            until = (self.since + datetime.timedelta(days=30)) if self.since else datetime.datetime.strptime('01/01/2010', '%m/%d/%Y')
+            until = (self.since + datetime.timedelta(days=self.chunked_by_days)) if self.since else datetime.datetime.strptime('01/01/2010', '%m/%d/%Y')
             since = self.since
             
             while until < datetime.datetime.now():
                 self.extract_chunk(since, until)
                 since = until
-                until = since + datetime.timedelta(days=30)
+                until = since + datetime.timedelta(days=self.chunked_by_days)
            
             self.extract_chunk(since, None) # get the last chunk, until now
         
@@ -189,7 +190,7 @@ class CommCareExportFormExtractor(CommCareExportExtractor):
     
     _incoming_table_class = IncomingForm
     
-    def __init__(self, domain, incremental=True):
+    def __init__(self, domain, chunked_by_date=True, incremental=True):
         '''
         Constructor
         '''
@@ -316,7 +317,7 @@ class CommCareExportCaseExtractor(CommCareExportExtractor):
 
     _incoming_table_class = IncomingCases
     
-    def __init__(self, domain, incremental=True):
+    def __init__(self, domain, chunked_by_date=True, incremental=True):
         '''
         Constructor
         '''
@@ -455,7 +456,8 @@ class CommCareExportDeviceLogExtractor(CommCareExportExtractor):
         '''
         Constructor
         '''
-        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, domain, chunked_by_date=True)
+        super(CommCareExportDeviceLogExtractor, self).__init__(self._incoming_table_class, domain, 
+            chunked_by_date=True, chunked_by_days=15)
 
     @property
     def _get_query(self):
@@ -631,7 +633,7 @@ class ProjectSpaceAdminAPIExtractor(HQAdminAPIExtractor):
     
     _incoming_table_class = IncomingWebUser
     _api_endpoint = 'project_space_metadata'
-    _limit = 50
+    _limit = 100
     
     def __init__(self, username, password):
         

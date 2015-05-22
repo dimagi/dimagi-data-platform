@@ -8,6 +8,8 @@ import getpass
 import logging
 import logging.handlers
 import os
+import time
+import json
 
 from commcare_export.commcare_hq_client import CommCareHqClient
 
@@ -69,26 +71,46 @@ def update_hq_admin_data(username, password):
     '''
     update domains, form definitions, and anything else that is not extracted per-domain from APIs
     '''
+    starting_time = time.clock()
     webuser_extractor = WebuserAdminAPIExtractor(username,password)
     domain_extractor = ProjectSpaceAdminAPIExtractor(username,password)
     domain_annotation_extractor = ExcelExtractor(IncomingDomainAnnotation, "domain_annotations.xlsx")
     form_annotation_extractor = ExcelExtractor(IncomingFormAnnotation, "form_annotations.xlsx")
     extractors = [domain_extractor,webuser_extractor, domain_annotation_extractor,form_annotation_extractor]
+    timing_dict = {}
     for extractor in extractors:
-        extractor.do_extract()
+        timing = run_extract(extractor)
+        extractor_name = extractor.__class__.__name__
+        logger.info("admin %s extract took %s seconds" % (extractor_name, timing))
+        timing_dict[extractor_name] = timing
     
     domain_loader = DomainLoader()
-    load_and_cleanup(domain_loader,domain_extractor, domain_annotation_extractor)
+    timing = load_and_cleanup(domain_loader,domain_extractor, domain_annotation_extractor)
+    timing_dict[domain_loader.__class__.__name__] = timing
     
     webuser_loader = WebUserLoader()
-    load_and_cleanup(webuser_loader,webuser_extractor)
+    timing = load_and_cleanup(webuser_loader,webuser_extractor)
+    timing_dict[webuser_loader.__class__.__name__] = timing
+
+    logger.info("Update Admin Data took %s seconds" % time.clock() - starting_time)
+    logger.info("%s" % timing_dict)
+
     
 @db.commit_on_success
 def load_and_cleanup(loader, *extractors):
+    starting_time = time.clock()  
     loader.do_load()
     
     for extractor in extractors:
         extractor.do_cleanup()
+    duration = time.clock() - starting_time
+    return duration
+
+def run_extract(extractor):
+    start_time = time.clock()
+    extractor.do_extract()
+    duration = time.clock() - start_time
+    return duration
                 
 def update_for_domain(dname, username, password, incremental):
     d = Domain.get(name=dname)
@@ -101,51 +123,69 @@ def update_for_domain(dname, username, password, incremental):
     devicelog_extractor = CommCareExportDeviceLogExtractor(dname)
     formdef_extractor = CommCareSlumberFormDefExtractor('v0.5', dname, conf.CC_USER, password)
     
-    extracters = [case_extractor,form_extractor,user_extractor,archived_user_extractor,webuser_extractor,formdef_extractor, devicelog_extractor]
+    extractors = [case_extractor,form_extractor,user_extractor,archived_user_extractor,webuser_extractor,formdef_extractor, devicelog_extractor]
     logger.info('TIMESTAMP starting commcare export for domain %s' % d.name)
     api_client = CommCareHqClient('https://www.commcarehq.org',dname,version='0.5').authenticated(username, password)
     
-    for extracter in extracters:
-        if (isinstance(extracter, CommCareExportExtractor)):
-            extracter.set_api_client(api_client)
-        extracter.extract()
+    timing_dict = {}
+    for extractor in extractors:
+        if (isinstance(extractor, CommCareExportExtractor)):
+            extractor.set_api_client(api_client)
+        timing = run_extract(extractor)
+        extractor_name = extractor.__class__.__name__
+        logger.info("%s extract for domain %s took %s seconds" % (extractor_name, dname, timing))
+        timing_dict[extractor_name] = timing
     
     logger.info('TIMESTAMP starting standard table updates for domain %s %s' % (d.name, datetime.datetime.now()))
     # these loaders should run even if there are no new forms, cases or device logs
     user_loader = UserLoader(dname,api_version='v0.5',username=conf.CC_USER, password=password)
-    load_and_cleanup(user_loader,user_extractor, user_extractor)
-    
+    timing = load_and_cleanup(user_loader,user_extractor, user_extractor)
+    timing_dict[user_loader.__class__.__name__] = timing
+
     app_loader = ApplicationLoader(dname)
-    load_and_cleanup(app_loader) # don't clean up yet, formdef_loader uses the same incoming table
+    timing = load_and_cleanup(app_loader) # don't clean up yet, formdef_loader uses the same incoming table
+    timing_dict[app_loader.__class__.__name__] = timing
+
     formdef_loader = FormDefLoader(dname)
-    load_and_cleanup(formdef_loader,formdef_extractor)
+    timing = load_and_cleanup(formdef_loader,formdef_extractor)
+    timing_dict[formdef_loader.__class__.__name__] = timing
     
     webuser_loader = WebUserLoader(dname)
-    load_and_cleanup(webuser_loader,webuser_extractor)
+    timing = load_and_cleanup(webuser_loader,webuser_extractor)
+    timing_dict[webuser_loader.__class__.__name__] = timing
     
     cases_to_import = IncomingCases.get_unimported(dname).count()
     if (cases_to_import > 0):
         logger.info('We have %d cases to import' % cases_to_import)
         case_loader = CasesLoader(dname, user_loader)
-        load_and_cleanup(case_loader,case_extractor)
+        timing = load_and_cleanup(case_loader,case_extractor)
+        timing_dict[case_loader.__class__.__name__] = timing
         
     forms_to_import = IncomingForm.get_unimported(dname).count()    
     if (forms_to_import > 0):
         logger.info('We have %d forms to import' % forms_to_import)
         form_loader = FormLoader(dname, user_loader)
-        load_and_cleanup(form_loader)
+        timing = load_and_cleanup(form_loader)
+        timing_dict[form_loader.__class__.__name__] = timing
         
         caseevent_loader = CaseEventLoader(dname)
-        load_and_cleanup(caseevent_loader,form_extractor)
+        timing = load_and_cleanup(caseevent_loader,form_extractor)
+        timing_dict[caseevent_loader.__class__.__name__] = timing
     
     visit_loader = VisitLoader(dname, regenerate_all=(not incremental))
-    load_and_cleanup(visit_loader)
+    timing = load_and_cleanup(visit_loader)
+    timing_dict[visit_loader.__class__.__name__] = timing
         
     device_logs_to_import = IncomingDeviceLog.get_unimported(dname).count()
     if (device_logs_to_import > 0):
         logger.info('We have %d device log entries to import' % device_logs_to_import)
         devicelog_loader = DeviceLogLoader(dname, user_loader)
-        load_and_cleanup(devicelog_loader,devicelog_extractor)
+        timing = load_and_cleanup(devicelog_loader,devicelog_extractor)
+        timing_dict[devicelog_loader.__class__.__name__] = timing
+
+    logger.info("--- Timing Log for domain: %s" % dname)
+    logger.info("%s" % timing_dict)
+    return timing_dict
 
 def get_missed_extractions(dname, start_time):
     d = Domain.get(name=dname)
@@ -161,20 +201,34 @@ def get_missed_extractions(dname, start_time):
             missed_extractions.append(e)
     return missed_extractions
 
+import os
+import errno
+
+def make_sure_path_exists(path):
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
 
 def update_for_domains(domainlist, username, password, start_time, incremental = True, allow_rerun=True):
     '''
     update per-domain data for domains in domainlist, using given HQ password and username specified in config_sys.json for API calls.
     '''
     missed_extractions= {}
+    timing_dict = {}
+    timing_logs = {}
     for dname in domainlist:
+        starting_time = time.clock()
         try:
-            update_for_domain(dname, username, password, incremental)
+            timing_log = update_for_domain(dname, username, password, incremental)
+            timing_logs[dname] = timing_log
                 
         except Exception, e:
                 logger.error('DID NOT FINISH IMPORT/UPDATE FOR DOMAIN %s ' % dname)
                 logger.exception(e)
-
+        timing_dict[dname] = time.clock() - starting_time
+        logger.info("Update for %s took %s seconds" % (dname, timing_dict[dname]))
         missed_extractions[dname] = get_missed_extractions(dname, start_time)
 
     missed_extractions = dict((k,v) for k,v in missed_extractions.items() if v)
@@ -182,9 +236,24 @@ def update_for_domains(domainlist, username, password, start_time, incremental =
     if allow_rerun:
         failed_domain_list = [dname for dname, missed in missed_extractions.items() if "CommCareExportFormExtractor" in missed]
         logger.info("Rerunning data pull for the following domains: %s" % failed_domain_list)
-        update_for_domains(failed_domain_list, username, password, start_time, incremental=incremental, allow_rerun=False) 
+        update_for_domains(failed_domain_list, username, password, start_time, incremental=incremental, allow_rerun=False)
+    
+        logger.info("---- Timing Info ----")
+        logger.info("%s" % timing_dict)
+        logger.info("---- Timing Logs ----")
+        logger.info("%s" % timing_logs)
+
+    time_str = "%s" % datetime.datetime.now()
+    if not allow_rerun:
+        time_str = "rerun-" + time_str
+    make_sure_path_exists('timing')
+    with open('timing/timing_info-%s' % time_str, 'w') as f:
+        json.dump(timing_dict, f)
+    with open('timing/timing_logs-%s' % time_str, 'w') as f:
+        json.dump(timing_logs, f)  
                 
 def update_from_salesforce():
+    starting_time = time.clock()
     sf_extractor = SalesforceExtractor(conf.SALESFORCE_USER,conf.SALESFORCE_PASS,conf.SALESFORCE_TOKEN)
     sf_extractor.do_extract()
     
@@ -192,6 +261,7 @@ def update_from_salesforce():
     sf_loader.do_load()
     
     sf_extractor.do_cleanup()
+    logger.info("Salesforce Update took: %s seconds" % time.clock() - starting_time)
         
 def main():
         start_time = datetime.datetime.now()

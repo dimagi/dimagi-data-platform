@@ -92,7 +92,7 @@ def update_hq_admin_data(username, password):
     timing = load_and_cleanup(webuser_loader,webuser_extractor)
     timing_dict[webuser_loader.__class__.__name__] = timing
 
-    logger.info("Update Admin Data took %s seconds" % time.clock() - starting_time)
+    logger.info("Update Admin Data took %s seconds" % (time.clock() - starting_time))
     logger.info("%s" % timing_dict)
 
     

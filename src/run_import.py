@@ -13,7 +13,7 @@ import json
 
 from commcare_export.commcare_hq_client import CommCareHqClient
 
-from dimagi_data_platform import incoming_data_tables, data_warehouse_db, conf
+from dimagi_data_platform import incoming_data_tables, data_warehouse_db, conf, emails
 from dimagi_data_platform.data_warehouse_db import Domain, HQExtractLog
 from dimagi_data_platform.extractors import ExcelExtractor, \
     CommCareExportCaseExtractor, CommCareExportFormExtractor, \
@@ -250,7 +250,8 @@ def update_for_domains(domainlist, username, password, start_time, incremental =
     with open('timing/timing_info-%s' % time_str, 'w') as f:
         json.dump(timing_dict, f)
     with open('timing/timing_logs-%s' % time_str, 'w') as f:
-        json.dump(timing_logs, f)  
+        json.dump(timing_logs, f)
+    return timing_dict, timing_log, missed_extractions  
                 
 def update_from_salesforce():
     starting_time = time.clock()
@@ -262,6 +263,7 @@ def update_from_salesforce():
     
     sf_extractor.do_cleanup()
     logger.info("Salesforce Update took: %s seconds" % time.clock() - starting_time)
+
         
 def main():
         start_time = datetime.datetime.now()
@@ -274,13 +276,19 @@ def main():
         logger.info('TIMESTAMP updating hq admin data - domains, forms definitions %s' % datetime.datetime.now())
         update_hq_admin_data(username, password)
         domain_list = get_domains(conf.RUN_CONF_JSON)
-        
+
         # default to incremental update
         incremental = conf.RUN_CONF_JSON['incremental'] if 'incremental' in conf.RUN_CONF_JSON else True
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
-        update_for_domains(domain_list, username, password, start_time, incremental = incremental)
+
+        emails.send_initial_email(domain_list, incremental, start_time)
+
+        timing_dict, _, missed_extractions = update_for_domains(domain_list, username, password,
+                                                                start_time, incremental = incremental)
+
+        emails.send_intermediary_email(domain_list, timing_dict, missed_extractions)
         
         update_from_salesforce()
     

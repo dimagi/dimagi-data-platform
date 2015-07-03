@@ -51,6 +51,10 @@ SALESFORCE_USER = _json_conf['salesforce']['username']
 SALESFORCE_PASS = _json_conf['salesforce']['password']
 SALESFORCE_TOKEN = _json_conf['salesforce']['token']
 
+EMAIL_FROM_USER = _json_conf['email_from']['username']
+EMAIL_FROM_PASS = _json_conf['email_from']['password']
+EMAILS_TO = _json_conf['emails_to']
+
 '''
 RUN CONFIGURATION - config_run.json
 Configures domains to update.

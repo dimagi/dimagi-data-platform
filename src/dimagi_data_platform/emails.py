@@ -44,9 +44,12 @@ def send_initial_email(gmail_pwd, start_time, incremental):
 
 
 def send_intermediary_email(gmail_pwd, domain_list):
-    msg = """All the admin data pull has been completed and we will now begin pulling individual domain data for the following domains:
+    num_domains = len(domain_list)
+    msg = """The admin data pull has been completed. 
+
+We will now begin pulling individual domain data for the following {num_domains} domains:
     {domain_list}
-    """.format(domain_list=", ".join(domain_list))
+    """.format(num_domains=num_domains, domain_list=", ".join(domain_list))
 
     send_email(gmail_pwd, "(Data Platform) Pulling Domain Data", msg)
 

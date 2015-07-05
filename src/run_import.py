@@ -217,6 +217,7 @@ def update_for_domains(domainlist, username, password, start_time, incremental =
     '''
     missed_extractions= {}
     timing_dict = {}
+    timing_log = None
     timing_logs = {}
     for dname in domainlist:
         starting_time = time.clock()

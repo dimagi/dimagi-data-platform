@@ -7,11 +7,10 @@ from dimagi_data_platform import incoming_data_tables, data_warehouse_db, conf
 logger = logging.getLogger('dimagi_data_platform')
 db = conf.PEEWEE_DB_CON
 
-def send_email(subj, txt):
+def send_email(gmail_pwd, subj, txt):
     #http://stackoverflow.com/questions/10147455/trying-to-send-email-gmail-as-mail-provider-using-python
 
     gmail_user = conf.EMAIL_FROM_USER
-    gmail_pwd = conf.EMAIL_FROM_PASS
     FROM = conf.EMAIL_FROM_USER
     TO = conf.EMAILS_TO
     SUBJECT = subj
@@ -32,23 +31,24 @@ def send_email(subj, txt):
     except:
         print "failed to send email"
 
-def send_initial_email(domain_list, incremental, start_time):
+def send_initial_email(gmail_pwd, start_time, incremental):
     if incremental:
         incremental_msg = "All data will be pulled incrementally"
     else:
         incremental_msg = "Data will not be pulled incrementally and will start pulling from the beginning of time."
+    msg = """A data pull was started {start_time} by {cc_user}.
 
-    msg = """
-    A data pull was started {start_time} by {cc_user}.
+{incremental_msg}
+    """.format(start_time=start_time, cc_user=conf.CC_USER, incremental_msg=incremental_msg)
+    send_email(gmail_pwd, "(Data Platform) A new data pull has begun", msg)
 
-    {incremental_msg}
 
-    Admin Data has already been pulled and we will now begin pulling data for the following domains:
+def send_intermediary_email(gmail_pwd, domain_list):
+    msg = """All the admin data pull has been completed and we will now begin pulling individual domain data for the following domains:
     {domain_list}
-    """.format(start_time=start_time, cc_user=conf.CC_USER, incremental_msg=incremental_msg, 
-        domain_list=", ".join(domain_list))
+    """.format(domain_list=", ".join(domain_list))
 
-    send_email("Data Pull Started", msg)
+    send_email(gmail_pwd, "(Data Platform) Pulling Domain Data", msg)
 
 def domains_not_extracted(dt):
     query_txt = ("select name from domain where id not in"
@@ -65,7 +65,7 @@ def domains_with_unimported_forms():
     return dict((row[1], int(row[0])) for row in cursor.fetchall())
 
 
-def send_intermediary_email(domain_list, timing_dict, missed_extractions):
+def send_finish_email(gmail_pwd, domain_list, timing_dict, missed_extractions):
     timing_string = '\n'.join("%s: %r seconds" % (d, round(t, 2)) for (d, t) in timing_dict.iteritems())
     missed_extractions_string = '\n'.join("%s: %r" % (d, ", ".join(es)) for (d, es) in missed_extractions.iteritems())
     dt = datetime.datetime.now()
@@ -99,4 +99,4 @@ ________________________________________________________________________________
  
     """.format(dt=dt, nonextracted_domains=nonextracted_domains, nonloaded_mapping=nonloaded_mapping, 
                missed_extractions=missed_extractions_string, timing=timing_string)
-    send_email("Domain Data Pull Completed", msg)
+    send_email(gmail_pwd, "(Data Platform) Domain Data Pull Completed", msg)

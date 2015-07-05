@@ -271,24 +271,28 @@ def main():
         setup()
         
         username = conf.CC_USER
-        password = getpass.getpass()
-        
-        logger.info('TIMESTAMP updating hq admin data - domains, forms definitions %s' % datetime.datetime.now())
-        update_hq_admin_data(username, password)
-        domain_list = get_domains(conf.RUN_CONF_JSON)
+        password = getpass.getpass("Please enter your CommCareHQ password: ")
+
+        if conf.EMAIL_FROM_USER:
+            gmail_pwd = getpass.getpass("Please enter your the email password for %s: " % conf.EMAIL_FROM_USER)
 
         # default to incremental update
         incremental = conf.RUN_CONF_JSON['incremental'] if 'incremental' in conf.RUN_CONF_JSON else True
         
+        logger.info('TIMESTAMP updating hq admin data - domains, forms definitions %s' % datetime.datetime.now())
+        emails.send_initial_email(gmail_pwd, start_time, incremental)
+        update_hq_admin_data(username, password)
+        domain_list = get_domains(conf.RUN_CONF_JSON)
+        
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))
 
-        emails.send_initial_email(domain_list, incremental, start_time)
+        emails.send_intermediary_email(gmail_pwd, domain_list)
 
         timing_dict, _, missed_extractions = update_for_domains(domain_list, username, password,
                                                                 start_time, incremental = incremental)
 
-        emails.send_intermediary_email(domain_list, timing_dict, missed_extractions)
+        emails.send_finish_email(gmail_pwd, domain_list, timing_dict, missed_extractions)
         
         update_from_salesforce()
     

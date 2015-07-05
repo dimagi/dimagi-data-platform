@@ -33,11 +33,7 @@
         	"password": "mypassword",
         	"token": "mysecuritytoken"
         },
-        "email_from":
-        {
-            "username": "data_platform@emailprovider.com",
-            "password": "data_platform_pass"
-        },
+        "email_from": "data_platform@emailprovider.com",
         "emails_to": ["data_platform_receivers_list@emailprovider.com"]
     }
 }

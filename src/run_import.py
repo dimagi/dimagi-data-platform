@@ -29,7 +29,7 @@ from dimagi_data_platform.loaders import DomainLoader, \
     UserLoader, FormLoader, CasesLoader, \
     VisitLoader, FormDefLoader, WebUserLoader, DeviceLogLoader, CaseEventLoader, \
     SalesforceObjectLoader, ApplicationLoader
-from dimagi_data_platform.utils import get_domains
+from dimagi_data_platform.utils import get_domains, get_domains_with_forms
 
 
 logger = logging.getLogger('dimagi_data_platform')
@@ -283,6 +283,9 @@ def main():
         emails.send_initial_email(gmail_pwd, start_time, incremental)
         update_hq_admin_data(username, password)
         domain_list = get_domains(conf.RUN_CONF_JSON)
+
+        domains_with_forms = get_domains_with_forms(username, password)
+        domain_list = [d for d in domain_list if d in domains_with_forms]
         
         logger.info('TIMESTAMP starting domain updates %s' % datetime.datetime.now())
         logger.info('domains for run are: %s' % ','.join(domain_list))

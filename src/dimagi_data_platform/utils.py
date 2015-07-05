@@ -5,8 +5,11 @@ Created on Jul 1, 2014
 '''
 import logging
 import subprocess
+import xlrd
+import os
 
 from dimagi_data_platform.data_warehouse_db import Domain
+from commcare_export.commcare_hq_client import CommCareHqClient
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,37 @@ def get_domains(run_conf_json):
         active_domains = Domain.select().where((Domain.name << conf_domains) & (Domain.active == True))
         return [d.name for d in active_domains]
     return conf_domains
+
+def get_domains_with_forms(username, password):
+    """Returns a list of all domains with atleast one form submission from the Admin Domain Report"""
+    report_url = "https://www.commcarehq.org/hq/admin/export/real_project_spaces/"
+
+    # we only need the client for the authenticated session, so we authenticate ourselves against a test domain 
+    api_client = CommCareHqClient('https://www.commcarehq.org',"test",version='0.5').authenticated(username, password)
+    auth = api_client._CommCareHqClient__auth  # we need to pull the auth attribute directly
+    response = api_client.session.get(report_url, params={"es_is_test": "false"}, auth=auth)
+
+    TMP_FILENAME = '_tmp_HQ_DOMAIN_REPORT_.xls'
+    output = open(TMP_FILENAME, 'wb')
+    output.write(response.content)
+    output.close()
+
+    PROJECT_COL = 0
+    FORM_COL = 11
+
+    workbook = xlrd.open_workbook(TMP_FILENAME)
+    sheet = workbook.sheet_by_index(0)
+    domains_by_forms = dict(zip(sheet.col_values(PROJECT_COL)[1:], sheet.col_values(FORM_COL)[1:]))
+    domains_by_forms = dict([(d, float(nf)) for (d, nf) in domains_by_forms.iteritems()])
+
+    os.remove(TMP_FILENAME)
+
+    domain_list = []
+    for domain, nforms in domains_by_forms.iteritems():
+        if nforms > 0:
+            domain_list.append(domain)
+    return domain_list
+
 
 def break_into_chunks(l, n):
     '''
